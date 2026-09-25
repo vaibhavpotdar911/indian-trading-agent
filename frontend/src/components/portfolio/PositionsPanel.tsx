@@ -6,6 +6,7 @@ import {
   deletePosition,
   getPositions,
   syncPositions,
+  syncUpstoxPositions,
   updatePosition,
 } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,6 +60,7 @@ type PositionsSummary = {
   day_pnl_pct: number;
   manual_count: number;
   kite_count: number;
+  upstox_count?: number;
 };
 
 type PositionsView = {
@@ -114,13 +116,15 @@ const emptyForm: FormState = {
   notes: "",
 };
 
-export function PositionsPanel({ kiteConnected, onPositionCountChange }: {
+export function PositionsPanel({ kiteConnected, upstoxConnected, onPositionCountChange }: {
   kiteConnected: boolean;
+  upstoxConnected?: boolean;
   onPositionCountChange?: (count: number) => void;
 }) {
   const [view, setView] = useState<PositionsView | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncingUpstox, setSyncingUpstox] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Position | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -141,7 +145,6 @@ export function PositionsPanel({ kiteConnected, onPositionCountChange }: {
 
   useEffect(() => {
     load();
-    // The loader is intentionally stable for this mount; refreshes call it explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -163,6 +166,27 @@ export function PositionsPanel({ kiteConnected, onPositionCountChange }: {
       toast.error(e instanceof Error ? e.message : "Kite sync failed");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleUpstoxSync = async () => {
+    setSyncingUpstox(true);
+    try {
+      const result = (await syncUpstoxPositions()) as {
+        added: number;
+        updated: number;
+        removed: number;
+        skipped_manual?: number;
+      };
+      toast.success(
+        `Synced from Upstox — ${result.added} added, ${result.updated} updated, ${result.removed} removed` +
+        (result.skipped_manual ? `; ${result.skipped_manual} manual position(s) preserved` : "")
+      );
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upstox sync failed");
+    } finally {
+      setSyncingUpstox(false);
     }
   };
 
@@ -276,12 +300,20 @@ export function PositionsPanel({ kiteConnected, onPositionCountChange }: {
             )}
             Sync from Kite
           </Button>
+          <Button size="sm" variant="outline" onClick={handleUpstoxSync} disabled={!upstoxConnected || syncingUpstox}>
+            {syncingUpstox ? (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3 w-3 mr-1" />
+            )}
+            Sync from Upstox
+          </Button>
         </div>
       </div>
 
-      {!kiteConnected && (
+      {(!kiteConnected && !upstoxConnected) && (
         <p className="text-xs text-muted-foreground">
-          Kite is not connected for today — sync is disabled, but your stored positions remain available below.
+          Brokers are not connected for today — sync is disabled, but your stored positions remain available below.
         </p>
       )}
 
@@ -292,7 +324,7 @@ export function PositionsPanel({ kiteConnected, onPositionCountChange }: {
               <p className="text-xs text-muted-foreground">Current Value</p>
               <p className="text-2xl font-bold">{money(summary.total_current)}</p>
               <p className="text-xs text-muted-foreground">
-                {summary.total_positions} positions ({summary.kite_count} kite, {summary.manual_count} manual)
+                {summary.total_positions} positions ({summary.kite_count} kite, {summary.upstox_count || 0} upstox, {summary.manual_count} manual)
               </p>
             </CardContent>
           </Card>
@@ -341,7 +373,7 @@ export function PositionsPanel({ kiteConnected, onPositionCountChange }: {
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                     No positions stored yet.
-                    {kiteConnected ? " Sync from Kite to import your holdings." : " Add one manually or connect Kite to sync."}
+                    {kiteConnected || upstoxConnected ? " Sync from connected broker to import your holdings." : " Add one manually or connect a broker to sync."}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -351,9 +383,9 @@ export function PositionsPanel({ kiteConnected, onPositionCountChange }: {
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={p.source === "kite" ? statusColors.info : statusColors.neutral}
+                        className={p.source === "kite" ? statusColors.info : p.source === "upstox" ? statusColors.orange : statusColors.neutral}
                       >
-                        {p.source === "kite" ? "KITE" : "MANUAL"}
+                        {p.source === "kite" ? "KITE" : p.source === "upstox" ? "UPSTOX" : "MANUAL"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">{p.quantity}</TableCell>

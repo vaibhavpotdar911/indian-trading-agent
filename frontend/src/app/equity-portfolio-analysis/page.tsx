@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   getEquityPortfolioReviewHistory,
@@ -9,12 +9,16 @@ import {
   getLatestEquityPortfolioReview,
   getPositions,
   getTelegramStatus,
+  getUpstoxLoginUrl,
+  getUpstoxStatus,
   logoutKite,
+  logoutUpstox,
   runEquityPortfolioReview,
+  saveKiteCredentials,
   saveTelegramSettings,
+  saveUpstoxCredentials,
   sendLatestEquityPortfolioReviewTelegram,
   sendTelegramTest,
-  saveKiteCredentials,
 } from "@/lib/api";
 import { PositionsPanel } from "@/components/portfolio/PositionsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -314,14 +318,18 @@ function RiskPanel({ review }: { review: Review }) {
 function EquityPortfolioAnalysisContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<KiteStatus | null>(null);
+  const [upstoxStatus, setUpstoxStatus] = useState<KiteStatus | null>(null);
   const [latest, setLatest] = useState<LatestReviewResponse | null>(null);
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
   const [history, setHistory] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingUpstox, setSavingUpstox] = useState(false);
   const [running, setRunning] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  const [upstoxApiKey, setUpstoxApiKey] = useState("");
+  const [upstoxApiSecret, setUpstoxApiSecret] = useState("");
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
@@ -333,14 +341,16 @@ function EquityPortfolioAnalysisContent() {
   const load = async () => {
     setLoading(true);
     try {
-      const [kiteStatus, telegramStatusRes, latestReviewRes, historyRes, positionsRes] = await Promise.all([
+      const [kiteStatus, upstoxStatusRes, telegramStatusRes, latestReviewRes, historyRes, positionsRes] = await Promise.all([
         getKiteStatus() as Promise<KiteStatus>,
+        getUpstoxStatus().catch(() => null) as Promise<KiteStatus | null>,
         getTelegramStatus().catch(() => null),
         getLatestEquityPortfolioReview().catch(() => ({ found: false, review: null })),
         getEquityPortfolioReviewHistory(30).catch(() => ({ reviews: [] })),
         getPositions().catch(() => ({ count: 0 })),
       ]);
       setStatus(kiteStatus);
+      setUpstoxStatus(upstoxStatusRes);
       setTelegramStatus(telegramStatusRes as TelegramStatus | null);
       setLatest(latestReviewRes as LatestReviewResponse);
       setHistory((historyRes as ReviewHistoryResponse).reviews || []);
@@ -354,9 +364,12 @@ function EquityPortfolioAnalysisContent() {
 
   useEffect(() => {
     const kite = searchParams.get("kite");
+    const upstox = searchParams.get("upstox");
     const message = searchParams.get("message");
     if (kite === "connected") toast.success("Kite connected for today");
     if (kite === "error") toast.error(message || "Kite login failed");
+    if (upstox === "connected") toast.success("Upstox connected for today");
+    if (upstox === "error") toast.error(message || "Upstox login failed");
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -376,12 +389,36 @@ function EquityPortfolioAnalysisContent() {
     }
   };
 
+  const saveUpstoxCreds = async () => {
+    setSavingUpstox(true);
+    try {
+      const result = await saveUpstoxCredentials({ api_key: upstoxApiKey, api_secret: upstoxApiSecret }) as KiteStatus;
+      setUpstoxStatus(result);
+      setUpstoxApiKey("");
+      setUpstoxApiSecret("");
+      toast.success("Upstox credentials saved");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to save Upstox credentials"));
+    } finally {
+      setSavingUpstox(false);
+    }
+  };
+
   const connectKite = async () => {
     try {
       const result = await getKiteLoginUrl() as { login_url: string };
       window.location.href = result.login_url;
     } catch (e: unknown) {
       toast.error(errorMessage(e, "Failed to create Kite login URL"));
+    }
+  };
+
+  const connectUpstox = async () => {
+    try {
+      const result = await getUpstoxLoginUrl() as { login_url: string };
+      window.location.href = result.login_url;
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to create Upstox login URL"));
     }
   };
 
@@ -407,6 +444,16 @@ function EquityPortfolioAnalysisContent() {
       toast.success("Kite session cleared");
     } catch (e: unknown) {
       toast.error(errorMessage(e, "Failed to clear Kite session"));
+    }
+  };
+
+  const disconnectUpstox = async () => {
+    try {
+      const result = await logoutUpstox() as { upstox: KiteStatus };
+      setUpstoxStatus(result.upstox);
+      toast.success("Upstox session cleared");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to clear Upstox session"));
     }
   };
 
@@ -460,11 +507,11 @@ function EquityPortfolioAnalysisContent() {
       <div className="p-6">
         <div className="py-20 text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="text-sm text-muted-foreground mt-3">Loading Kite portfolio state...</p>
+          <p className="text-sm text-muted-foreground mt-3">Loading portfolio state...</p>
         </div>
       </div>
     );
-}
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -473,7 +520,7 @@ function EquityPortfolioAnalysisContent() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Wallet className="h-6 w-6" /> Equity portfolio analysis
           </h1>
-          <p className="text-sm text-muted-foreground">Read-only Kite holdings review with stored daily insights</p>
+          <p className="text-sm text-muted-foreground">Read-only Kite & Upstox holdings review with stored daily insights</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={runReview} disabled={running || positionCount === 0}>
@@ -481,70 +528,103 @@ function EquityPortfolioAnalysisContent() {
             Run Review
           </Button>
           {status?.connected_today && (
-              <Button variant="ghost" size="sm" onClick={disconnect}>
-                <LogOut className="h-3 w-3 mr-1" /> Clear Session
-              </Button>
+            <Button variant="ghost" size="sm" onClick={disconnect}>
+              <LogOut className="h-3 w-3 mr-1" /> Clear Kite Session
+            </Button>
+          )}
+          {upstoxStatus?.connected_today && (
+            <Button variant="ghost" size="sm" onClick={disconnectUpstox}>
+              <LogOut className="h-3 w-3 mr-1" /> Clear Upstox Session
+            </Button>
           )}
         </div>
       </div>
 
-      {!status?.connected_today && (
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Zerodha Kite Card */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              {status?.configured ? "Update Kite Credentials" : "Kite Credentials"}
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center justify-between">
+              <span>Zerodha Kite</span>
+              {status?.connected_today && <Badge variant="outline" className={statusColors.bullish}>Connected Today</Badge>}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 max-w-xl">
-            <Input placeholder="KITE_API_KEY" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-            <Input
-              placeholder="KITE_API_SECRET"
-              type="password"
-              value={apiSecret}
-              onChange={(e) => setApiSecret(e.target.value)}
-            />
-            <Button onClick={saveCredentials} disabled={saving || !apiKey || !apiSecret}>
-              {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-              {status?.configured ? "Update Credentials" : "Save Credentials"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {status?.configured && !status?.connected_today && (
-        <Card className="border-blue-100 dark:border-blue-800">
-          <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="font-medium">Kite login required for today</p>
-              <p className="text-sm text-muted-foreground">
-                API key {status.masked_api_key || "saved"} is configured. Complete Kite login to fetch holdings.
-              </p>
-            </div>
-            <Button onClick={connectKite}>
-              <ExternalLink className="h-3 w-3 mr-1" /> Connect Kite for Today
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {status?.connected_today && (
-        <Card className="border-green-100 dark:border-green-800">
-          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <div>
-                <p className="text-sm font-medium">Kite connected for today</p>
-                <p className="text-xs text-muted-foreground">
-                  {status.profile?.user_shortname || status.profile?.user_name || "Zerodha account"} · token date {status.token_date}
-                </p>
+          <CardContent className="space-y-3">
+            {!status?.connected_today && (
+              <>
+                <Input placeholder="KITE_API_KEY" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+                <Input
+                  placeholder="KITE_API_SECRET"
+                  type="password"
+                  value={apiSecret}
+                  onChange={(e) => setApiSecret(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={saveCredentials} disabled={saving || !apiKey || !apiSecret}>
+                    {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                    {status?.configured ? "Update Credentials" : "Save Credentials"}
+                  </Button>
+                  {status?.configured && (
+                    <Button size="sm" variant="outline" onClick={connectKite}>
+                      <ExternalLink className="h-3 w-3 mr-1" /> Connect Kite
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+            {status?.connected_today && (
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Kite connected for {status.profile?.user_shortname || status.profile?.user_name || "today"}</span>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
-      )}
+
+        {/* Upstox Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center justify-between">
+              <span>Upstox</span>
+              {upstoxStatus?.connected_today && <Badge variant="outline" className={statusColors.orange}>Connected Today</Badge>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!upstoxStatus?.connected_today && (
+              <>
+                <Input placeholder="UPSTOX_API_KEY" value={upstoxApiKey} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUpstoxApiKey(e.target.value)} />
+                <Input
+                  placeholder="UPSTOX_API_SECRET"
+                  type="password"
+                  value={upstoxApiSecret}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUpstoxApiSecret(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={saveUpstoxCreds} disabled={savingUpstox || !upstoxApiKey || !upstoxApiSecret}>
+                    {savingUpstox ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                    {upstoxStatus?.configured ? "Update Credentials" : "Save Credentials"}
+                  </Button>
+                  {upstoxStatus?.configured && (
+                    <Button size="sm" variant="outline" onClick={connectUpstox}>
+                      <ExternalLink className="h-3 w-3 mr-1" /> Connect Upstox
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+            {upstoxStatus?.connected_today && (
+              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Upstox connected for {upstoxStatus.profile?.user_name || "today"}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <PositionsPanel
         kiteConnected={!!status?.connected_today}
+        upstoxConnected={!!upstoxStatus?.connected_today}
         onPositionCountChange={setPositionCount}
       />
 

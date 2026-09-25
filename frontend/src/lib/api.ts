@@ -156,12 +156,19 @@ export const login = (credentials: LoginCredentials | string) =>
 export const logout = () => fetchAPI(`/api/auth/logout`, { method: "POST" });
 export const getAuthStatus = () => fetchAPI<AuthStatus>(`/api/auth/status`);
 
-// Kite + Equity Portfolio Analysis
+// Kite + Upstox + Equity Portfolio Analysis
 export const getKiteStatus = () => fetchAPI(`/api/kite/status`);
 export const saveKiteCredentials = (data: { api_key: string; api_secret: string }) =>
   fetchAPI(`/api/kite/credentials`, { method: "PUT", body: JSON.stringify(data) });
 export const getKiteLoginUrl = () => fetchAPI(`/api/kite/login-url`);
 export const logoutKite = () => fetchAPI(`/api/kite/logout`, { method: "POST" });
+
+export const getUpstoxStatus = () => fetchAPI(`/api/upstox/status`);
+export const saveUpstoxCredentials = (data: { api_key: string; api_secret: string }) =>
+  fetchAPI(`/api/upstox/credentials`, { method: "PUT", body: JSON.stringify(data) });
+export const getUpstoxLoginUrl = () => fetchAPI(`/api/upstox/login-url`);
+export const logoutUpstox = () => fetchAPI(`/api/upstox/logout`, { method: "POST" });
+
 export const getEquityHoldings = () => fetchAPI(`/api/equity-portfolio/holdings`);
 export const runEquityPortfolioReview = () =>
   fetchAPI(`/api/equity-portfolio/reviews`, { method: "POST" });
@@ -182,9 +189,10 @@ export const deleteTelegramSettings = () => fetchAPI(`/api/telegram/settings`, {
 export const sendTelegramTest = (text?: string) =>
   fetchAPI(`/api/telegram/test`, { method: "POST", body: JSON.stringify({ text: text || null }) });
 
-// Positions (local store, synced from Kite on demand)
+// Positions (local store, synced from Kite/Upstox on demand)
 export const getPositions = () => fetchAPI(`/api/positions`);
 export const syncPositions = () => fetchAPI(`/api/positions/sync`, { method: "POST" });
+export const syncUpstoxPositions = () => fetchAPI(`/api/positions/sync-upstox`, { method: "POST" });
 export const addPosition = (data: {
   tradingsymbol: string;
   exchange?: string;
