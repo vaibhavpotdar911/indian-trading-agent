@@ -125,6 +125,8 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, onPositionCount
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncingUpstox, setSyncingUpstox] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Position | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -187,6 +189,32 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, onPositionCount
       toast.error(e instanceof Error ? e.message : "Upstox sync failed");
     } finally {
       setSyncingUpstox(false);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    let kiteSuccess = false;
+    let upstoxSuccess = false;
+    try {
+      if (kiteConnected) {
+        await syncPositions();
+        kiteSuccess = true;
+      }
+      if (upstoxConnected) {
+        await syncUpstoxPositions();
+        upstoxSuccess = true;
+      }
+      toast.success(
+        `Multi-Broker Sync Complete — ${
+          [kiteSuccess && "Kite", upstoxSuccess && "Upstox"].filter(Boolean).join(" & ") || "No brokers connected"
+        }`
+      );
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Multi-broker sync encountered an error");
+    } finally {
+      setSyncingAll(false);
     }
   };
 
@@ -276,7 +304,15 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, onPositionCount
   }
 
   const summary = view?.summary;
-  const positions = view?.positions || [];
+  const rawPositions = view?.positions || [];
+
+  const positions = rawPositions.filter((p) => {
+    if (sourceFilter === "all") return true;
+    if (sourceFilter === "kite") return p.source === "kite";
+    if (sourceFilter === "upstox") return p.source === "upstox";
+    if (sourceFilter === "manual") return p.source === "manual" || p.source === "local_position";
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -292,13 +328,23 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, onPositionCount
           <Button variant="outline" size="sm" onClick={openAdd}>
             <Plus className="h-3 w-3 mr-1" /> Add Position
           </Button>
-          <Button size="sm" onClick={handleSync} disabled={!kiteConnected || syncing}>
+          {(kiteConnected || upstoxConnected) && (
+            <Button size="sm" onClick={handleSyncAll} disabled={syncingAll || syncing || syncingUpstox}>
+              {syncingAll ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3 mr-1" />
+              )}
+              Sync All Brokers
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={handleSync} disabled={!kiteConnected || syncing}>
             {syncing ? (
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             ) : (
               <RefreshCw className="h-3 w-3 mr-1" />
             )}
-            Sync from Kite
+            Kite
           </Button>
           <Button size="sm" variant="outline" onClick={handleUpstoxSync} disabled={!upstoxConnected || syncingUpstox}>
             {syncingUpstox ? (
@@ -306,7 +352,7 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, onPositionCount
             ) : (
               <RefreshCw className="h-3 w-3 mr-1" />
             )}
-            Sync from Upstox
+            Upstox
           </Button>
         </div>
       </div>
@@ -350,6 +396,39 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, onPositionCount
           </Card>
         </div>
       )}
+
+      {/* Broker Source Filter Bar */}
+      <div className="flex items-center gap-2 border-b pb-2">
+        <span className="text-xs font-medium text-muted-foreground mr-1">Filter Source:</span>
+        <Button
+          variant={sourceFilter === "all" ? "default" : "ghost"}
+          size="xs"
+          onClick={() => setSourceFilter("all")}
+        >
+          All ({rawPositions.length})
+        </Button>
+        <Button
+          variant={sourceFilter === "kite" ? "default" : "ghost"}
+          size="xs"
+          onClick={() => setSourceFilter("kite")}
+        >
+          Zerodha Kite ({summary?.kite_count || 0})
+        </Button>
+        <Button
+          variant={sourceFilter === "upstox" ? "default" : "ghost"}
+          size="xs"
+          onClick={() => setSourceFilter("upstox")}
+        >
+          Upstox ({summary?.upstox_count || 0})
+        </Button>
+        <Button
+          variant={sourceFilter === "manual" ? "default" : "ghost"}
+          size="xs"
+          onClick={() => setSourceFilter("manual")}
+        >
+          Manual ({summary?.manual_count || 0})
+        </Button>
+      </div>
 
       <Card>
         <CardContent className="p-0">

@@ -540,87 +540,189 @@ function EquityPortfolioAnalysisContent() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Zerodha Kite Card */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center justify-between">
-              <span>Zerodha Kite</span>
-              {status?.connected_today && <Badge variant="outline" className={statusColors.bullish}>Connected Today</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {!status?.connected_today && (
-              <>
-                <Input placeholder="KITE_API_KEY" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-                <Input
-                  placeholder="KITE_API_SECRET"
-                  type="password"
-                  value={apiSecret}
-                  onChange={(e) => setApiSecret(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={saveCredentials} disabled={saving || !apiKey || !apiSecret}>
-                    {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-                    {status?.configured ? "Update Credentials" : "Save Credentials"}
-                  </Button>
-                  {status?.configured && (
-                    <Button size="sm" variant="outline" onClick={connectKite}>
-                      <ExternalLink className="h-3 w-3 mr-1" /> Connect Kite
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
-            {status?.connected_today && (
-              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Kite connected for {status.profile?.user_shortname || status.profile?.user_name || "today"}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Multi-Broker Connections Hub */}
+      <Card>
+        <CardHeader className="pb-3 border-b">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-primary" /> Broker Connectors
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Connect your Indian broker accounts for read-only equity holdings sync
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="outline" className={status?.connected_today ? statusColors.bullish : statusColors.neutral}>
+                Kite: {status?.connected_today ? "Connected" : status?.configured ? "Configured" : "Not Set"}
+              </Badge>
+              <Badge variant="outline" className={upstoxStatus?.connected_today ? statusColors.orange : statusColors.neutral}>
+                Upstox: {upstoxStatus?.connected_today ? "Connected" : upstoxStatus?.configured ? "Configured" : "Not Set"}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <Tabs defaultValue="kite" className="w-full">
+            <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full mb-4">
+              <TabsTrigger value="kite" className="flex items-center gap-1.5 text-xs">
+                <span className={`h-2 w-2 rounded-full ${status?.connected_today ? "bg-emerald-500" : status?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                Zerodha Kite
+              </TabsTrigger>
+              <TabsTrigger value="upstox" className="flex items-center gap-1.5 text-xs">
+                <span className={`h-2 w-2 rounded-full ${upstoxStatus?.connected_today ? "bg-amber-500" : upstoxStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                Upstox
+              </TabsTrigger>
+              <TabsTrigger value="angel" className="text-xs text-muted-foreground">
+                Angel One <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="groww" className="text-xs text-muted-foreground">
+                Groww <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="icici" className="text-xs text-muted-foreground">
+                ICICI Direct <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+              </TabsTrigger>
+            </TabsList>
 
-        {/* Upstox Card */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center justify-between">
-              <span>Upstox</span>
-              {upstoxStatus?.connected_today && <Badge variant="outline" className={statusColors.orange}>Connected Today</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {!upstoxStatus?.connected_today && (
-              <>
-                <Input placeholder="UPSTOX_API_KEY" value={upstoxApiKey} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUpstoxApiKey(e.target.value)} />
-                <Input
-                  placeholder="UPSTOX_API_SECRET"
-                  type="password"
-                  value={upstoxApiSecret}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUpstoxApiSecret(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={saveUpstoxCreds} disabled={savingUpstox || !upstoxApiKey || !upstoxApiSecret}>
-                    {savingUpstox ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-                    {upstoxStatus?.configured ? "Update Credentials" : "Save Credentials"}
-                  </Button>
-                  {upstoxStatus?.configured && (
-                    <Button size="sm" variant="outline" onClick={connectUpstox}>
-                      <ExternalLink className="h-3 w-3 mr-1" /> Connect Upstox
-                    </Button>
-                  )}
+            {/* Zerodha Kite Tab */}
+            <TabsContent value="kite" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                <div>
+                  <h3 className="font-semibold text-sm">Zerodha Kite Connect</h3>
+                  <p className="text-xs text-muted-foreground">Read-only equity holdings OAuth2 integration for Zerodha</p>
                 </div>
-              </>
-            )}
-            {upstoxStatus?.connected_today && (
-              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Upstox connected for {upstoxStatus.profile?.user_name || "today"}</span>
+                {status?.connected_today ? (
+                  <Badge variant="outline" className={statusColors.bullish}>Session Active Today</Badge>
+                ) : (
+                  <Badge variant="outline" className={statusColors.neutral}>{status?.configured ? "Configured" : "Credentials Required"}</Badge>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+
+              {!status?.connected_today ? (
+                <div className="space-y-3 max-w-md">
+                  <Input
+                    placeholder="KITE_API_KEY (e.g. abc123def456)"
+                    value={apiKey}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)}
+                  />
+                  <Input
+                    placeholder="KITE_API_SECRET (e.g. xyz789secret)"
+                    type="password"
+                    value={apiSecret}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiSecret(e.target.value)}
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={saveCredentials} disabled={saving || !apiKey || !apiSecret}>
+                      {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                      {status?.configured ? "Update Credentials" : "Save Credentials"}
+                    </Button>
+                    {status?.configured && (
+                      <Button size="sm" variant="outline" onClick={connectKite}>
+                        <ExternalLink className="h-3 w-3 mr-1" /> Connect Kite OAuth
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-green-50/30 dark:bg-green-950/20 text-sm">
+                  <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <div>
+                      <p className="font-medium">Kite connected for {status.profile?.user_shortname || status.profile?.user_name || "today"}</p>
+                      <p className="text-xs opacity-80">Access token valid for current trading session</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={disconnect}>
+                    <LogOut className="h-3.5 w-3.5 mr-1" /> Disconnect
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Upstox Tab */}
+            <TabsContent value="upstox" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                <div>
+                  <h3 className="font-semibold text-sm">Upstox API v2</h3>
+                  <p className="text-xs text-muted-foreground">Read-only equity long-term holdings integration for Upstox</p>
+                </div>
+                {upstoxStatus?.connected_today ? (
+                  <Badge variant="outline" className={statusColors.orange}>Session Active Today</Badge>
+                ) : (
+                  <Badge variant="outline" className={statusColors.neutral}>{upstoxStatus?.configured ? "Configured" : "Credentials Required"}</Badge>
+                )}
+              </div>
+
+              {!upstoxStatus?.connected_today ? (
+                <div className="space-y-3 max-w-md">
+                  <Input
+                    placeholder="UPSTOX_API_KEY"
+                    value={upstoxApiKey}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUpstoxApiKey(e.target.value)}
+                  />
+                  <Input
+                    placeholder="UPSTOX_API_SECRET"
+                    type="password"
+                    value={upstoxApiSecret}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUpstoxApiSecret(e.target.value)}
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={saveUpstoxCreds} disabled={savingUpstox || !upstoxApiKey || !upstoxApiSecret}>
+                      {savingUpstox ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                      {upstoxStatus?.configured ? "Update Credentials" : "Save Credentials"}
+                    </Button>
+                    {upstoxStatus?.configured && (
+                      <Button size="sm" variant="outline" onClick={connectUpstox}>
+                        <ExternalLink className="h-3 w-3 mr-1" /> Connect Upstox OAuth
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-amber-50/30 dark:bg-amber-950/20 text-sm">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <div>
+                      <p className="font-medium">Upstox connected for {upstoxStatus.profile?.user_name || "today"}</p>
+                      <p className="text-xs opacity-80">Access token valid for current trading session</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={disconnectUpstox}>
+                    <LogOut className="h-3.5 w-3.5 mr-1" /> Disconnect
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Angel One Tab */}
+            <TabsContent value="angel" className="p-4 text-center border rounded-lg bg-muted/20">
+              <h4 className="font-semibold text-sm">Angel One SmartAPI</h4>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                Read-only SmartAPI holdings synchronization for Angel One accounts is coming soon in the next update.
+              </p>
+              <Badge variant="secondary" className="mt-3">Coming Soon</Badge>
+            </TabsContent>
+
+            {/* Groww Tab */}
+            <TabsContent value="groww" className="p-4 text-center border rounded-lg bg-muted/20">
+              <h4 className="font-semibold text-sm">Groww API Connector</h4>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                Direct portfolio holdings sync for Groww accounts is currently on our integration roadmap.
+              </p>
+              <Badge variant="secondary" className="mt-3">Coming Soon</Badge>
+            </TabsContent>
+
+            {/* ICICI Direct Tab */}
+            <TabsContent value="icici" className="p-4 text-center border rounded-lg bg-muted/20">
+              <h4 className="font-semibold text-sm">ICICI Breeze API</h4>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                Read-only Breeze API integration for ICICI Direct equity portfolios is planned for upcoming releases.
+              </p>
+              <Badge variant="secondary" className="mt-3">Coming Soon</Badge>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       <PositionsPanel
         kiteConnected={!!status?.connected_today}
