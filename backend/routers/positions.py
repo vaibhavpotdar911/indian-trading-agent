@@ -5,7 +5,12 @@ from pydantic import BaseModel
 
 from backend.brokers.kite import KiteAuthExpired, KiteConfigError
 from backend.brokers.upstox import UpstoxAuthExpired, UpstoxConfigError
-from backend.positions import PositionsError, get_positions_view, remove_position, save_manual_position, sync_positions_from_kite, sync_positions_from_upstox, update_position_fields
+from backend.brokers.kotak_neo import KotakNeoAuthExpired, KotakNeoConfigError
+from backend.positions import (
+    PositionsError, get_positions_view, remove_position, save_manual_position,
+    sync_positions_from_kite, sync_positions_from_kotak_neo, sync_positions_from_upstox,
+    update_position_fields,
+)
 
 router = APIRouter(prefix="/api/positions", tags=["positions"])
 
@@ -29,9 +34,9 @@ class PositionUpdateRequest(BaseModel):
 
 
 def _broker_error(exc: Exception, broker: str = "Broker") -> HTTPException:
-    if isinstance(exc, (KiteAuthExpired, UpstoxAuthExpired)):
+    if isinstance(exc, (KiteAuthExpired, UpstoxAuthExpired, KotakNeoAuthExpired)):
         return HTTPException(status_code=401, detail=str(exc))
-    if isinstance(exc, (KiteConfigError, UpstoxConfigError)):
+    if isinstance(exc, (KiteConfigError, UpstoxConfigError, KotakNeoConfigError)):
         return HTTPException(status_code=400, detail=str(exc))
     return HTTPException(status_code=502, detail=f"{broker} sync failed")
 
@@ -55,6 +60,14 @@ def sync_upstox():
         return sync_positions_from_upstox()
     except Exception as exc:
         raise _broker_error(exc, "Upstox")
+
+
+@router.post("/sync-kotak-neo")
+def sync_kotak_neo():
+    try:
+        return sync_positions_from_kotak_neo()
+    except Exception as exc:
+        raise _broker_error(exc, "Kotak Neo")
 
 
 @router.post("")

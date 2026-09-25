@@ -16,7 +16,11 @@ import {
   runEquityPortfolioReview,
   saveKiteCredentials,
   saveTelegramSettings,
-  saveUpstoxCredentials,
+  getKotakNeoStatus,
+  saveKotakNeoCredentials,
+  loginKotakNeo,
+  logoutKotakNeo,
+  syncKotakNeoPositions,
   sendLatestEquityPortfolioReviewTelegram,
   sendTelegramTest,
 } from "@/lib/api";
@@ -64,6 +68,17 @@ type KiteStatus = {
   connected_today: boolean;
   token_date?: string | null;
   masked_api_key?: string | null;
+  profile?: {
+    user_shortname?: string;
+    user_name?: string;
+  } | null;
+};
+
+type KotakNeoStatus = {
+  configured: boolean;
+  connected_today: boolean;
+  masked_consumer_key?: string | null;
+  mobile_number?: string | null;
   profile?: {
     user_shortname?: string;
     user_name?: string;
@@ -319,31 +334,43 @@ function EquityPortfolioAnalysisContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<KiteStatus | null>(null);
   const [upstoxStatus, setUpstoxStatus] = useState<KiteStatus | null>(null);
+  const [kotakNeoStatus, setKotakNeoStatus] = useState<KotakNeoStatus | null>(null);
   const [latest, setLatest] = useState<LatestReviewResponse | null>(null);
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
   const [history, setHistory] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingUpstox, setSavingUpstox] = useState(false);
+  const [savingKotak, setSavingKotak] = useState(false);
+  const [loggingInKotak, setLoggingInKotak] = useState(false);
   const [running, setRunning] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [upstoxApiKey, setUpstoxApiKey] = useState("");
   const [upstoxApiSecret, setUpstoxApiSecret] = useState("");
+  const [kotakConsumerKey, setKotakConsumerKey] = useState("");
+  const [kotakConsumerSecret, setKotakConsumerSecret] = useState("");
+  const [kotakMobileNumber, setKotakMobileNumber] = useState("");
+  const [kotakPanDob, setKotakPanDob] = useState("");
+  const [kotakMpinPassword, setKotakMpinPassword] = useState("");
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
   const [sendingTelegram, setSendingTelegram] = useState(false);
   const [positionCount, setPositionCount] = useState(0);
 
+  const [activeBrokers, setActiveBrokers] = useState<string[]>(["kite", "upstox", "kotak_neo"]);
+  const [activeBrokerTab, setActiveBrokerTab] = useState<string>("kite");
+
   const latestReview = latest?.review || null;
 
   const load = async () => {
     setLoading(true);
     try {
-      const [kiteStatus, upstoxStatusRes, telegramStatusRes, latestReviewRes, historyRes, positionsRes] = await Promise.all([
+      const [kiteStatus, upstoxStatusRes, kotakStatusRes, telegramStatusRes, latestReviewRes, historyRes, positionsRes] = await Promise.all([
         getKiteStatus() as Promise<KiteStatus>,
         getUpstoxStatus().catch(() => null) as Promise<KiteStatus | null>,
+        getKotakNeoStatus().catch(() => null) as Promise<KotakNeoStatus | null>,
         getTelegramStatus().catch(() => null),
         getLatestEquityPortfolioReview().catch(() => ({ found: false, review: null })),
         getEquityPortfolioReviewHistory(30).catch(() => ({ reviews: [] })),
@@ -351,6 +378,7 @@ function EquityPortfolioAnalysisContent() {
       ]);
       setStatus(kiteStatus);
       setUpstoxStatus(upstoxStatusRes);
+      setKotakNeoStatus(kotakStatusRes);
       setTelegramStatus(telegramStatusRes as TelegramStatus | null);
       setLatest(latestReviewRes as LatestReviewResponse);
       setHistory((historyRes as ReviewHistoryResponse).reviews || []);
@@ -402,6 +430,61 @@ function EquityPortfolioAnalysisContent() {
     } finally {
       setSavingUpstox(false);
     }
+  };
+
+  const saveKotakCreds = async () => {
+    setSavingKotak(true);
+    try {
+      const res = (await saveKotakNeoCredentials({
+        consumer_key: kotakConsumerKey,
+        consumer_secret: kotakConsumerSecret,
+        mobile_number: kotakMobileNumber,
+        pan_or_dob: kotakPanDob || undefined,
+      })) as KotakNeoStatus;
+      setKotakNeoStatus(res);
+      setKotakConsumerKey("");
+      setKotakConsumerSecret("");
+      toast.success("Kotak Neo credentials saved");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to save Kotak Neo credentials"));
+    } finally {
+      setSavingKotak(false);
+    }
+  };
+
+  const loginKotakSession = async () => {
+    setLoggingInKotak(true);
+    try {
+      const res = (await loginKotakNeo({ mpin_or_password: kotakMpinPassword })) as {
+        connected: boolean;
+        kotak_neo: KotakNeoStatus;
+      };
+      setKotakNeoStatus(res.kotak_neo);
+      setKotakMpinPassword("");
+      toast.success("Logged in to Kotak Neo for today");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Kotak Neo session login failed"));
+    } finally {
+      setLoggingInKotak(false);
+    }
+  };
+
+  const disconnectKotakNeo = async () => {
+    try {
+      const res = (await logoutKotakNeo()) as { kotak_neo: KotakNeoStatus };
+      setKotakNeoStatus(res.kotak_neo);
+      toast.success("Kotak Neo session cleared");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "Failed to clear Kotak Neo session"));
+    }
+  };
+
+  const handleAddBroker = (brokerKey: string) => {
+    if (!activeBrokers.includes(brokerKey)) {
+      setActiveBrokers((prev: string[]) => [...prev, brokerKey]);
+    }
+    setActiveBrokerTab(brokerKey);
+    toast.success("Broker added to tab bar");
   };
 
   const connectKite = async () => {
@@ -543,7 +626,7 @@ function EquityPortfolioAnalysisContent() {
       {/* Multi-Broker Connections Hub */}
       <Card>
         <CardHeader className="pb-3 border-b">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Wallet className="h-5 w-5 text-primary" /> Broker Connectors
@@ -552,36 +635,92 @@ function EquityPortfolioAnalysisContent() {
                 Connect your Indian broker accounts for read-only equity holdings sync
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <Badge variant="outline" className={status?.connected_today ? statusColors.bullish : statusColors.neutral}>
-                Kite: {status?.connected_today ? "Connected" : status?.configured ? "Configured" : "Not Set"}
-              </Badge>
-              <Badge variant="outline" className={upstoxStatus?.connected_today ? statusColors.orange : statusColors.neutral}>
-                Upstox: {upstoxStatus?.connected_today ? "Connected" : upstoxStatus?.configured ? "Configured" : "Not Set"}
-              </Badge>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="outline" className={status?.connected_today ? statusColors.bullish : status?.configured ? statusColors.info : statusColors.neutral}>
+                  Kite: {status?.connected_today ? "Connected" : status?.configured ? "Configured" : "Not Set"}
+                </Badge>
+                <Badge variant="outline" className={upstoxStatus?.connected_today ? statusColors.orange : upstoxStatus?.configured ? statusColors.info : statusColors.neutral}>
+                  Upstox: {upstoxStatus?.connected_today ? "Connected" : upstoxStatus?.configured ? "Configured" : "Not Set"}
+                </Badge>
+                <Badge variant="outline" className={kotakNeoStatus?.connected_today ? statusColors.caution : kotakNeoStatus?.configured ? statusColors.info : statusColors.neutral}>
+                  Kotak Neo: {kotakNeoStatus?.connected_today ? "Connected" : kotakNeoStatus?.configured ? "Configured" : "Not Set"}
+                </Badge>
+              </div>
+
+              {/* Add Broker Dropdown */}
+              <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-md border text-xs">
+                <span className="text-[11px] font-medium text-muted-foreground pl-1.5">+ Add Broker:</span>
+                <select
+                  className="h-7 rounded border-none bg-background px-2 py-0 text-xs font-medium shadow-xs focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                    if (e.target.value) {
+                      handleAddBroker(e.target.value);
+                      e.target.value = "";
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Select broker...</option>
+                  <option value="kite">Zerodha Kite (OAuth2)</option>
+                  <option value="upstox">Upstox (OAuth2)</option>
+                  <option value="kotak_neo">Kotak Neo (API v1)</option>
+                  <option value="angel">Angel One (SmartAPI)</option>
+                  <option value="groww">Groww API</option>
+                  <option value="icici">ICICI Direct Breeze</option>
+                  <option value="dhan">Dhan HQ</option>
+                  <option value="fivepaisa">5paisa</option>
+                </select>
+              </div>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-4">
-          <Tabs defaultValue="kite" className="w-full">
-            <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full mb-4">
-              <TabsTrigger value="kite" className="flex items-center gap-1.5 text-xs">
-                <span className={`h-2 w-2 rounded-full ${status?.connected_today ? "bg-emerald-500" : status?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
-                Zerodha Kite
-              </TabsTrigger>
-              <TabsTrigger value="upstox" className="flex items-center gap-1.5 text-xs">
-                <span className={`h-2 w-2 rounded-full ${upstoxStatus?.connected_today ? "bg-amber-500" : upstoxStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
-                Upstox
-              </TabsTrigger>
-              <TabsTrigger value="angel" className="text-xs text-muted-foreground">
-                Angel One <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="groww" className="text-xs text-muted-foreground">
-                Groww <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="icici" className="text-xs text-muted-foreground">
-                ICICI Direct <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
-              </TabsTrigger>
+          <Tabs value={activeBrokerTab} onValueChange={setActiveBrokerTab} className="w-full">
+            <TabsList className="flex flex-wrap gap-1 w-full mb-4 bg-muted/50 p-1 h-auto">
+              {activeBrokers.includes("kite") && (
+                <TabsTrigger value="kite" className="flex items-center gap-1.5 text-xs px-3 py-1.5">
+                  <span className={`h-2 w-2 rounded-full ${status?.connected_today ? "bg-emerald-500" : status?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                  Zerodha Kite
+                </TabsTrigger>
+              )}
+              {activeBrokers.includes("upstox") && (
+                <TabsTrigger value="upstox" className="flex items-center gap-1.5 text-xs px-3 py-1.5">
+                  <span className={`h-2 w-2 rounded-full ${upstoxStatus?.connected_today ? "bg-amber-500" : upstoxStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                  Upstox
+                </TabsTrigger>
+              )}
+              {activeBrokers.includes("kotak_neo") && (
+                <TabsTrigger value="kotak_neo" className="flex items-center gap-1.5 text-xs px-3 py-1.5">
+                  <span className={`h-2 w-2 rounded-full ${kotakNeoStatus?.connected_today ? "bg-purple-500" : kotakNeoStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                  Kotak Neo
+                </TabsTrigger>
+              )}
+              {activeBrokers.includes("angel") && (
+                <TabsTrigger value="angel" className="text-xs px-3 py-1.5 text-muted-foreground">
+                  Angel One <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+                </TabsTrigger>
+              )}
+              {activeBrokers.includes("groww") && (
+                <TabsTrigger value="groww" className="text-xs px-3 py-1.5 text-muted-foreground">
+                  Groww <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+                </TabsTrigger>
+              )}
+              {activeBrokers.includes("icici") && (
+                <TabsTrigger value="icici" className="text-xs px-3 py-1.5 text-muted-foreground">
+                  ICICI Direct <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+                </TabsTrigger>
+              )}
+              {activeBrokers.includes("dhan") && (
+                <TabsTrigger value="dhan" className="text-xs px-3 py-1.5 text-muted-foreground">
+                  Dhan <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+                </TabsTrigger>
+              )}
+              {activeBrokers.includes("fivepaisa") && (
+                <TabsTrigger value="fivepaisa" className="text-xs px-3 py-1.5 text-muted-foreground">
+                  5paisa <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Zerodha Kite Tab */}
@@ -694,31 +833,146 @@ function EquityPortfolioAnalysisContent() {
               )}
             </TabsContent>
 
+            {/* Kotak Neo Tab */}
+            <TabsContent value="kotak_neo" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                <div>
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    Kotak Neo API Connector
+                    <Badge variant="secondary" className="text-[10px] px-1.5">Equity Read-Only</Badge>
+                  </h3>
+                  <p className="text-xs text-muted-foreground">Read-only equity portfolio holdings sync for Kotak Neo accounts</p>
+                </div>
+                {kotakNeoStatus?.connected_today ? (
+                  <Badge variant="outline" className={statusColors.caution}>Session Active Today</Badge>
+                ) : (
+                  <Badge variant="outline" className={statusColors.neutral}>{kotakNeoStatus?.configured ? "Configured" : "Credentials Required"}</Badge>
+                )}
+              </div>
+
+              {!kotakNeoStatus?.connected_today ? (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Step 1: Credentials */}
+                  <div className="space-y-3 border rounded-lg p-4 bg-muted/10">
+                    <h4 className="font-medium text-xs text-muted-foreground uppercase tracking-wider">1. API Credentials</h4>
+                    <Input
+                      placeholder="Consumer Key (e.g. key_12345)"
+                      value={kotakConsumerKey}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKotakConsumerKey(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Consumer Secret"
+                      type="password"
+                      value={kotakConsumerSecret}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKotakConsumerSecret(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Mobile Number (e.g. +919876543210)"
+                      value={kotakMobileNumber}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKotakMobileNumber(e.target.value)}
+                    />
+                    <Input
+                      placeholder="PAN or DOB (optional)"
+                      value={kotakPanDob}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKotakPanDob(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={saveKotakCreds}
+                      disabled={savingKotak || !kotakConsumerKey || !kotakConsumerSecret || !kotakMobileNumber}
+                    >
+                      {savingKotak ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                      {kotakNeoStatus?.configured ? "Update Credentials" : "Save Credentials"}
+                    </Button>
+                  </div>
+
+                  {/* Step 2: Session Login */}
+                  <div className="space-y-3 border rounded-lg p-4 bg-muted/10">
+                    <h4 className="font-medium text-xs text-muted-foreground uppercase tracking-wider">2. Daily Session Login</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Enter your MPIN or Password to initialize session token for today&apos;s holdings fetch.
+                    </p>
+                    <Input
+                      placeholder="Kotak Neo MPIN or Password"
+                      type="password"
+                      value={kotakMpinPassword}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKotakMpinPassword(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={loginKotakSession}
+                      disabled={loggingInKotak || !kotakNeoStatus?.configured || !kotakMpinPassword}
+                    >
+                      {loggingInKotak ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 mr-1" />}
+                      Start Daily Session
+                    </Button>
+                    {!kotakNeoStatus?.configured && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400">Please save credentials in Step 1 first.</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-purple-50/30 dark:bg-purple-950/20 text-sm">
+                  <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <div>
+                      <p className="font-medium">
+                        Kotak Neo session active for {kotakNeoStatus.profile?.user_shortname || kotakNeoStatus.profile?.user_name || "Account"}
+                      </p>
+                      <p className="text-xs opacity-80">Connected via key {kotakNeoStatus.masked_consumer_key || "saved"}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={disconnectKotakNeo}>
+                    <LogOut className="h-3.5 w-3.5 mr-1" /> Disconnect Session
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
             {/* Angel One Tab */}
-            <TabsContent value="angel" className="p-4 text-center border rounded-lg bg-muted/20">
+            <TabsContent value="angel" className="p-4 text-center border rounded-lg bg-muted/20 space-y-2">
               <h4 className="font-semibold text-sm">Angel One SmartAPI</h4>
-              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
                 Read-only SmartAPI holdings synchronization for Angel One accounts is coming soon in the next update.
               </p>
-              <Badge variant="secondary" className="mt-3">Coming Soon</Badge>
+              <Badge variant="secondary" className="mt-2">Coming Soon</Badge>
             </TabsContent>
 
             {/* Groww Tab */}
-            <TabsContent value="groww" className="p-4 text-center border rounded-lg bg-muted/20">
+            <TabsContent value="groww" className="p-4 text-center border rounded-lg bg-muted/20 space-y-2">
               <h4 className="font-semibold text-sm">Groww API Connector</h4>
-              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
                 Direct portfolio holdings sync for Groww accounts is currently on our integration roadmap.
               </p>
-              <Badge variant="secondary" className="mt-3">Coming Soon</Badge>
+              <Badge variant="secondary" className="mt-2">Coming Soon</Badge>
             </TabsContent>
 
             {/* ICICI Direct Tab */}
-            <TabsContent value="icici" className="p-4 text-center border rounded-lg bg-muted/20">
+            <TabsContent value="icici" className="p-4 text-center border rounded-lg bg-muted/20 space-y-2">
               <h4 className="font-semibold text-sm">ICICI Breeze API</h4>
-              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
                 Read-only Breeze API integration for ICICI Direct equity portfolios is planned for upcoming releases.
               </p>
-              <Badge variant="secondary" className="mt-3">Coming Soon</Badge>
+              <Badge variant="secondary" className="mt-2">Coming Soon</Badge>
+            </TabsContent>
+
+            {/* Dhan Tab */}
+            <TabsContent value="dhan" className="p-4 text-center border rounded-lg bg-muted/20 space-y-2">
+              <h4 className="font-semibold text-sm">Dhan HQ API</h4>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                Read-only Dhan HQ portfolio holdings integration will be available shortly.
+              </p>
+              <Badge variant="secondary" className="mt-2">Coming Soon</Badge>
+            </TabsContent>
+
+            {/* 5paisa Tab */}
+            <TabsContent value="fivepaisa" className="p-4 text-center border rounded-lg bg-muted/20 space-y-2">
+              <h4 className="font-semibold text-sm">5paisa API</h4>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                Direct portfolio holdings sync for 5paisa trading accounts is planned for upcoming releases.
+              </p>
+              <Badge variant="secondary" className="mt-2">Coming Soon</Badge>
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -727,6 +981,7 @@ function EquityPortfolioAnalysisContent() {
       <PositionsPanel
         kiteConnected={!!status?.connected_today}
         upstoxConnected={!!upstoxStatus?.connected_today}
+        kotakNeoConnected={!!kotakNeoStatus?.connected_today}
         onPositionCountChange={setPositionCount}
       />
 

@@ -5,7 +5,11 @@ from datetime import date
 from threading import Lock
 from typing import Any
 
-from backend.db import delete_position, get_position, get_setting, list_positions, replace_kite_positions, replace_upstox_positions, set_setting, upsert_position
+from backend.db import (
+    delete_position, get_position, get_setting, list_positions,
+    replace_kite_positions, replace_kotak_neo_positions, replace_upstox_positions,
+    set_setting, upsert_position,
+)
 
 POSITIONS_LAST_SYNC = "positions_last_sync_at"
 _SYNC_LOCK = Lock()
@@ -44,11 +48,13 @@ def get_positions_view() -> dict:
     manual_count = sum(row.get("source") == "manual" for row in positions)
     kite_count = sum(row.get("source") == "kite" for row in positions)
     upstox_count = sum(row.get("source") == "upstox" for row in positions)
+    kotak_neo_count = sum(row.get("source") == "kotak_neo" for row in positions)
     return {
         "positions": enriched, "count": len(enriched), "last_sync": get_setting(POSITIONS_LAST_SYNC),
-        "source_mode": "manual" if manual_count and not (kite_count or upstox_count)
-        else "kite" if kite_count and not (manual_count or upstox_count)
-        else "upstox" if upstox_count and not (manual_count or kite_count)
+        "source_mode": "manual" if manual_count and not (kite_count or upstox_count or kotak_neo_count)
+        else "kite" if kite_count and not (manual_count or upstox_count or kotak_neo_count)
+        else "upstox" if upstox_count and not (manual_count or kite_count or kotak_neo_count)
+        else "kotak_neo" if kotak_neo_count and not (manual_count or kite_count or upstox_count)
         else "mixed" if positions else "empty",
         "summary": {
             "total_positions": len(enriched), "total_invested": total_invested,
@@ -58,6 +64,7 @@ def get_positions_view() -> dict:
             "day_pnl_pct": round(total_day_pnl / (total_current - total_day_pnl) * 100, 2)
             if total_current - total_day_pnl else 0.0,
             "manual_count": manual_count, "kite_count": kite_count, "upstox_count": upstox_count,
+            "kotak_neo_count": kotak_neo_count,
         },
     }
 
@@ -83,6 +90,19 @@ def sync_positions_from_upstox() -> dict:
         if not isinstance(holdings, list):
             raise PositionsError("Upstox returned an invalid holdings snapshot")
         counts = replace_upstox_positions(holdings)
+        synced_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        set_setting(POSITIONS_LAST_SYNC, synced_at)
+        return {"status": "synced", "synced_at": synced_at, **counts, "summary": get_positions_view()["summary"]}
+
+
+def sync_positions_from_kotak_neo() -> dict:
+    """Fetch and apply a Kotak Neo snapshot only when this endpoint is called."""
+    from backend.brokers.kotak_neo import fetch_equity_holdings
+    with _SYNC_LOCK:
+        holdings = fetch_equity_holdings()
+        if not isinstance(holdings, list):
+            raise PositionsError("Kotak Neo returned an invalid holdings snapshot")
+        counts = replace_kotak_neo_positions(holdings)
         synced_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         set_setting(POSITIONS_LAST_SYNC, synced_at)
         return {"status": "synced", "synced_at": synced_at, **counts, "summary": get_positions_view()["summary"]}

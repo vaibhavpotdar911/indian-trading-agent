@@ -156,7 +156,7 @@ export const login = (credentials: LoginCredentials | string) =>
 export const logout = () => fetchAPI(`/api/auth/logout`, { method: "POST" });
 export const getAuthStatus = () => fetchAPI<AuthStatus>(`/api/auth/status`);
 
-// Kite + Upstox + Equity Portfolio Analysis
+// Kite + Upstox + Kotak Neo + Equity Portfolio Analysis
 export const getKiteStatus = () => fetchAPI(`/api/kite/status`);
 export const saveKiteCredentials = (data: { api_key: string; api_secret: string }) =>
   fetchAPI(`/api/kite/credentials`, { method: "PUT", body: JSON.stringify(data) });
@@ -168,6 +168,17 @@ export const saveUpstoxCredentials = (data: { api_key: string; api_secret: strin
   fetchAPI(`/api/upstox/credentials`, { method: "PUT", body: JSON.stringify(data) });
 export const getUpstoxLoginUrl = () => fetchAPI(`/api/upstox/login-url`);
 export const logoutUpstox = () => fetchAPI(`/api/upstox/logout`, { method: "POST" });
+
+export const getKotakNeoStatus = () => fetchAPI(`/api/kotak-neo/status`);
+export const saveKotakNeoCredentials = (data: {
+  consumer_key: string;
+  consumer_secret: string;
+  mobile_number: string;
+  pan_or_dob?: string;
+}) => fetchAPI(`/api/kotak-neo/credentials`, { method: "PUT", body: JSON.stringify(data) });
+export const loginKotakNeo = (data: { mpin_or_password: string; session_token?: string }) =>
+  fetchAPI(`/api/kotak-neo/login`, { method: "POST", body: JSON.stringify(data) });
+export const logoutKotakNeo = () => fetchAPI(`/api/kotak-neo/logout`, { method: "POST" });
 
 export const getEquityHoldings = () => fetchAPI(`/api/equity-portfolio/holdings`);
 export const runEquityPortfolioReview = () =>
@@ -189,10 +200,11 @@ export const deleteTelegramSettings = () => fetchAPI(`/api/telegram/settings`, {
 export const sendTelegramTest = (text?: string) =>
   fetchAPI(`/api/telegram/test`, { method: "POST", body: JSON.stringify({ text: text || null }) });
 
-// Positions (local store, synced from Kite/Upstox on demand)
+// Positions (local store, synced from Kite/Upstox/Kotak Neo on demand)
 export const getPositions = () => fetchAPI(`/api/positions`);
 export const syncPositions = () => fetchAPI(`/api/positions/sync`, { method: "POST" });
 export const syncUpstoxPositions = () => fetchAPI(`/api/positions/sync-upstox`, { method: "POST" });
+export const syncKotakNeoPositions = () => fetchAPI(`/api/positions/sync-kotak-neo`, { method: "POST" });
 export const addPosition = (data: {
   tradingsymbol: string;
   exchange?: string;
