@@ -20,6 +20,12 @@ EXCHANGE_SUFFIXES = {
 }
 
 
+SYMBOL_ALIASES = {
+    "TATAMOTORS": "TMPV",
+    "TATAMTRDVR": "TMPV",
+}
+
+
 def normalize_ticker(symbol: str, exchange: str = "NSE") -> str:
     """Normalize a ticker symbol for yfinance queries.
 
@@ -35,6 +41,8 @@ def normalize_ticker(symbol: str, exchange: str = "NSE") -> str:
         Normalized ticker string for yfinance
     """
     symbol = symbol.strip().upper()
+    if symbol in SYMBOL_ALIASES:
+        symbol = SYMBOL_ALIASES[symbol]
 
     # Check if it's a known index
     if symbol in POPULAR_INDICES:
