@@ -277,6 +277,19 @@ export const getCalendarForTicker = (ticker: string, days = 2) =>
 export const refreshEarningsCalendar = (universe = "nifty100") =>
   fetchAPI(`/api/calendar/refresh-earnings?universe=${universe}`, { method: "POST" });
 
+// Multi-Broker Integrations & Persistent Tabs
+export const getBrokerTabs = () => fetchAPI(`/api/brokers/tabs`);
+export const getSupportedBrokers = () => fetchAPI(`/api/brokers/supported`);
+export const configureBroker = (brokerKey: string, credentials: Record<string, any>) =>
+  fetchAPI(`/api/brokers/${brokerKey}/configure`, {
+    method: "POST",
+    body: JSON.stringify({ credentials }),
+  });
+export const removeBroker = (brokerKey: string) =>
+  fetchAPI(`/api/brokers/${brokerKey}`, { method: "DELETE" });
+export const syncBroker = (brokerKey: string) =>
+  fetchAPI(`/api/brokers/${brokerKey}/sync`, { method: "POST" });
+
 // FII/DII
 export const getFiiDiiToday = (forceRefresh = false) =>
   fetchAPI(`/api/fii-dii/today${forceRefresh ? "?force_refresh=true" : ""}`);
