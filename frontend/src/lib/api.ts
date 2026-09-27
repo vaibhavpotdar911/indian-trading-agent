@@ -180,6 +180,10 @@ export const loginKotakNeo = (data: { mpin_or_password: string; session_token?: 
   fetchAPI(`/api/kotak-neo/login`, { method: "POST", body: JSON.stringify(data) });
 export const logoutKotakNeo = () => fetchAPI(`/api/kotak-neo/logout`, { method: "POST" });
 
+export const getMarketDataVendorStatus = () => fetchAPI(`/api/market-data/vendor`);
+export const saveMarketDataVendorSetting = (vendor: string) =>
+  fetchAPI(`/api/market-data/vendor`, { method: "PUT", body: JSON.stringify({ vendor }) });
+
 export const getEquityHoldings = () => fetchAPI(`/api/equity-portfolio/holdings`);
 export const runEquityPortfolioReview = () =>
   fetchAPI(`/api/equity-portfolio/reviews`, { method: "POST" });
