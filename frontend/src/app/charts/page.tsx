@@ -7,10 +7,15 @@ import { getChartData } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { HelpSection } from "@/components/HelpSection";
 import { chartsHelp } from "@/lib/help-content";
+import { TradingViewAdvancedChart } from "@/components/charts/TradingViewAdvancedChart";
+import { LineChart, BarChart2 } from "lucide-react";
 
 const periods = ["1mo", "3mo", "6mo", "1y", "2y"];
+
+type ChartEngine = "tradingview" | "lightweight";
 
 type ChartPoint = {
   time: string;
@@ -26,10 +31,12 @@ type ChartResponse = { data?: unknown };
 function isChartPoint(value: unknown): value is ChartPoint {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
-  return typeof row.time === "string"
-    && ["open", "high", "low", "close", "volume"].every(
-      (field) => typeof row[field] === "number" && Number.isFinite(row[field]),
-    );
+  return (
+    typeof row.time === "string" &&
+    ["open", "high", "low", "close", "volume"].every(
+      (field) => typeof row[field] === "number" && Number.isFinite(row[field])
+    )
+  );
 }
 
 function getChartOptions(isDark: boolean) {
@@ -41,46 +48,70 @@ function getChartOptions(isDark: boolean) {
 
 export default function ChartsPage() {
   const { resolvedTheme } = useTheme();
+  const [engine, setEngine] = useState<ChartEngine>("tradingview");
+  const [exchange, setExchange] = useState<"NSE" | "BSE">("NSE");
   const [ticker, setTicker] = useState("RELIANCE");
+  const [submittedTicker, setSubmittedTicker] = useState("RELIANCE");
   const [period, setPeriod] = useState("3mo");
   const [data, setData] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<IChartApi | null>(null);
 
-  const loadChart = useCallback(async (symbol?: string) => {
-    const t = symbol || ticker;
-    if (!t.trim()) return;
-    setLoading(true);
-    try {
-      const result = await getChartData(t.trim(), period) as ChartResponse;
-      setData(Array.isArray(result.data) ? result.data.filter(isChartPoint) : []);
-    } catch {
-      setData([]);
-    } finally {
-      setLoading(false);
+  // Load user engine preference from localStorage
+  useEffect(() => {
+    const savedEngine = localStorage.getItem("chart_engine_preference") as ChartEngine | null;
+    if (savedEngine === "lightweight" || savedEngine === "tradingview") {
+      setEngine(savedEngine);
     }
-  }, [ticker, period]);
+  }, []);
+
+  const switchEngine = (newEngine: ChartEngine) => {
+    setEngine(newEngine);
+    localStorage.setItem("chart_engine_preference", newEngine);
+  };
+
+  const loadChart = useCallback(
+    async (symbol?: string) => {
+      const t = symbol || ticker;
+      if (!t.trim()) return;
+      const clean = t.trim().toUpperCase();
+      setSubmittedTicker(clean);
+
+      if (engine === "lightweight") {
+        setLoading(true);
+        try {
+          const result = (await getChartData(clean, period)) as ChartResponse;
+          setData(Array.isArray(result.data) ? result.data.filter(isChartPoint) : []);
+        } catch {
+          setData([]);
+        } finally {
+          setLoading(false);
+        }
+      }
+    },
+    [ticker, period, engine]
+  );
 
   useEffect(() => {
-    loadChart();
-    // The ticker field is intentionally submitted via Load/Enter; period is
-    // the auto-refresh trigger.
+    if (engine === "lightweight") {
+      loadChart();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [period, engine]);
 
   useEffect(() => {
-    if (!chartRef.current || data.length === 0) return;
+    if (engine !== "lightweight" || !chartRef.current || data.length === 0) return;
 
     let disposed = false;
 
-    // Cleanup previous
     if (chartInstance.current) {
-      try { chartInstance.current.remove(); } catch {}
+      try {
+        chartInstance.current.remove();
+      } catch {}
       chartInstance.current = null;
     }
 
-    // Dynamic import to avoid SSR issues
     let chart: IChartApi | null = null;
 
     (async () => {
@@ -101,14 +132,16 @@ export default function ChartsPage() {
           horzLines: { color: gridColor },
         },
         width: chartRef.current.clientWidth,
-        height: 500,
+        height: 550,
         crosshair: { mode: 0 },
         timeScale: { borderColor },
         rightPriceScale: { borderColor },
       });
 
       if (disposed) {
-        try { chart.remove(); } catch {}
+        try {
+          chart.remove();
+        } catch {}
         return;
       }
 
@@ -155,7 +188,9 @@ export default function ChartsPage() {
 
     const handleResize = () => {
       if (chartInstance.current && chartRef.current) {
-        try { chartInstance.current.applyOptions({ width: chartRef.current.clientWidth }); } catch {}
+        try {
+          chartInstance.current.applyOptions({ width: chartRef.current.clientWidth });
+        } catch {}
       }
     };
     window.addEventListener("resize", handleResize);
@@ -164,74 +199,161 @@ export default function ChartsPage() {
       disposed = true;
       window.removeEventListener("resize", handleResize);
       if (chartInstance.current) {
-        try { chartInstance.current.remove(); } catch {}
+        try {
+          chartInstance.current.remove();
+        } catch {}
         chartInstance.current = null;
       }
       if (chart && chart !== chartInstance.current) {
-        try { chart.remove(); } catch {}
+        try {
+          chart.remove();
+        } catch {}
       }
     };
-  }, [data, resolvedTheme]);
+  }, [data, resolvedTheme, engine]);
+
+  const handleSearchSubmit = () => {
+    const clean = ticker.trim().toUpperCase();
+    if (!clean) return;
+    setSubmittedTicker(clean);
+    if (engine === "lightweight") {
+      loadChart(clean);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Charts</h1>
-        <p className="text-sm text-muted-foreground">Interactive candlestick charts for NSE stocks</p>
+      {/* Page Header + Engine Toggle */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            Charts
+            <Badge variant="outline" className="text-xs uppercase font-mono">
+              {engine === "tradingview" ? "TradingView Full" : "Lightweight"}
+            </Badge>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Interactive charting for NSE/BSE stocks with indicator tools and multi-timeframes
+          </p>
+        </div>
+
+        {/* Engine Toggle Buttons */}
+        <div className="inline-flex items-center p-1 rounded-xl border border-border bg-muted/50">
+          <button
+            onClick={() => switchEngine("tradingview")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              engine === "tradingview"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart2 className="h-3.5 w-3.5 text-blue-500" />
+            TradingView Full
+          </button>
+          <button
+            onClick={() => switchEngine("lightweight")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              engine === "lightweight"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LineChart className="h-3.5 w-3.5 text-green-500" />
+            Lightweight Charts
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-3 items-end">
-        <div className="w-64">
+      {/* Ticker Search Controls */}
+      <div className="flex flex-wrap gap-3 items-center justify-between bg-card p-3.5 rounded-xl border border-border shadow-sm">
+        <div className="flex gap-2 items-center flex-1 min-w-[280px] max-w-md">
           <Input
-            placeholder="Enter ticker (e.g., RELIANCE)"
+            placeholder="Enter ticker (e.g., RELIANCE, TMPV, TCS)"
             value={ticker}
             onChange={(e) => setTicker(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && loadChart()}
+            onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
             className="font-sans"
           />
+          <Button onClick={handleSearchSubmit} disabled={loading && engine === "lightweight"}>
+            {loading && engine === "lightweight" ? "Loading..." : "Load"}
+          </Button>
         </div>
-        <Button onClick={() => loadChart()} disabled={loading}>
-          {loading ? "Loading..." : "Load"}
-        </Button>
-        <div className="flex gap-1 ml-4">
-          {periods.map((p) => (
-            <Button
-              key={p}
-              variant={period === p ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPeriod(p)}
-            >
-              {p}
-            </Button>
-          ))}
-        </div>
+
+        {/* Engine-specific Controls */}
+        {engine === "tradingview" ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-medium">Exchange:</span>
+            <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/40 text-xs">
+              <button
+                onClick={() => setExchange("NSE")}
+                className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${
+                  exchange === "NSE" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                NSE
+              </button>
+              <button
+                onClick={() => setExchange("BSE")}
+                className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${
+                  exchange === "BSE" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                BSE
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-1 items-center">
+            <span className="text-xs text-muted-foreground mr-1">Period:</span>
+            {periods.map((p) => (
+              <Button
+                key={p}
+                variant={period === p ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPeriod(p)}
+                className="h-8 text-xs"
+              >
+                {p}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <div
-            ref={chartRef}
-            className="w-full"
-            style={{ minHeight: 500, display: data.length > 0 ? "block" : "none" }}
-          />
-          {data.length === 0 && (
-            <div className="h-[500px] flex items-center justify-center text-muted-foreground">
-              {loading ? "Loading chart data..." : "Enter a ticker and click Load to view chart"}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Main Chart Container */}
+      {engine === "tradingview" ? (
+        <TradingViewAdvancedChart ticker={submittedTicker} exchange={exchange} height={650} />
+      ) : (
+        <Card>
+          <CardContent className="p-4">
+            <div
+              ref={chartRef}
+              className="w-full"
+              style={{ minHeight: 550, display: data.length > 0 ? "block" : "none" }}
+            />
+            {data.length === 0 && (
+              <div className="h-[550px] flex items-center justify-center text-muted-foreground">
+                {loading ? "Loading chart data..." : "Enter a ticker and click Load to view chart"}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Attribution required by the TradingView Lightweight Charts license */}
-      <p className="text-xs text-muted-foreground">
-        Charts powered by{" "}
+      {/* License & Attribution */}
+      <p className="text-xs text-muted-foreground flex items-center justify-between">
+        <span>
+          {engine === "tradingview"
+            ? "Full TradingView Advanced Real-Time Chart Widget with technical indicators, drawing tools & multi-timeframe controls."
+            : "Lightweight Charts powered by TradingView Lightweight Charts™."}
+        </span>
         <a
-          href="https://www.tradingview.com/lightweight-charts/"
+          href={engine === "tradingview" ? "https://www.tradingview.com" : "https://www.tradingview.com/lightweight-charts/"}
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-foreground"
         >
-          TradingView Lightweight Charts™
+          TradingView™
         </a>
       </p>
 
