@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { statusColors } from "@/lib/status-colors";
 import { HelpSection } from "@/components/HelpSection";
+import { BrokerLogo } from "@/components/brokers/BrokerLogos";
 
 const equityHelp = [
   {
@@ -722,13 +723,16 @@ function EquityPortfolioAnalysisContent() {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-wrap gap-2 text-xs">
-                <Badge variant="outline" className={status?.connected_today ? statusColors.bullish : status?.configured ? statusColors.info : statusColors.neutral}>
+                <Badge variant="outline" className={`flex items-center gap-1.5 ${status?.connected_today ? statusColors.bullish : status?.configured ? statusColors.info : statusColors.neutral}`}>
+                  <BrokerLogo brokerKey="kite" className="h-3.5 w-3.5" />
                   Kite: {status?.connected_today ? "Connected" : status?.configured ? "Configured" : "Not Set"}
                 </Badge>
-                <Badge variant="outline" className={upstoxStatus?.connected_today ? statusColors.orange : upstoxStatus?.configured ? statusColors.info : statusColors.neutral}>
+                <Badge variant="outline" className={`flex items-center gap-1.5 ${upstoxStatus?.connected_today ? statusColors.orange : upstoxStatus?.configured ? statusColors.info : statusColors.neutral}`}>
+                  <BrokerLogo brokerKey="upstox" className="h-3.5 w-3.5" />
                   Upstox: {upstoxStatus?.connected_today ? "Connected" : upstoxStatus?.configured ? "Configured" : "Not Set"}
                 </Badge>
-                <Badge variant="outline" className={kotakNeoStatus?.connected_today ? statusColors.caution : kotakNeoStatus?.configured ? statusColors.info : statusColors.neutral}>
+                <Badge variant="outline" className={`flex items-center gap-1.5 ${kotakNeoStatus?.connected_today ? statusColors.caution : kotakNeoStatus?.configured ? statusColors.info : statusColors.neutral}`}>
+                  <BrokerLogo brokerKey="kotak_neo" className="h-3.5 w-3.5" />
                   Kotak Neo: {kotakNeoStatus?.connected_today ? "Connected" : kotakNeoStatus?.configured ? "Configured" : "Not Set"}
                 </Badge>
               </div>
@@ -762,47 +766,55 @@ function EquityPortfolioAnalysisContent() {
         </CardHeader>
         <CardContent className="pt-4">
           <Tabs value={activeBrokerTab} onValueChange={setActiveBrokerTab} className="w-full">
-            <TabsList className="flex flex-wrap gap-1 w-full mb-4 bg-muted/50 p-1 h-auto">
+            <TabsList className="flex flex-wrap gap-1.5 w-full mb-4 bg-muted/50 p-1.5 h-auto">
               {activeBrokers.includes("kite") && (
-                <TabsTrigger value="kite" className="flex items-center gap-1.5 text-xs px-3 py-1.5">
-                  <span className={`h-2 w-2 rounded-full ${status?.connected_today ? "bg-emerald-500" : status?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                <TabsTrigger value="kite" className="flex items-center gap-2 text-xs px-3 py-1.5">
+                  <BrokerLogo brokerKey="kite" className="h-4 w-4" />
                   Zerodha Kite
+                  <span className={`h-2 w-2 rounded-full ml-0.5 ${status?.connected_today ? "bg-emerald-500" : status?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
                 </TabsTrigger>
               )}
               {activeBrokers.includes("upstox") && (
-                <TabsTrigger value="upstox" className="flex items-center gap-1.5 text-xs px-3 py-1.5">
-                  <span className={`h-2 w-2 rounded-full ${upstoxStatus?.connected_today ? "bg-amber-500" : upstoxStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                <TabsTrigger value="upstox" className="flex items-center gap-2 text-xs px-3 py-1.5">
+                  <BrokerLogo brokerKey="upstox" className="h-4 w-4" />
                   Upstox
+                  <span className={`h-2 w-2 rounded-full ml-0.5 ${upstoxStatus?.connected_today ? "bg-amber-500" : upstoxStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
                 </TabsTrigger>
               )}
               {activeBrokers.includes("kotak_neo") && (
-                <TabsTrigger value="kotak_neo" className="flex items-center gap-1.5 text-xs px-3 py-1.5">
-                  <span className={`h-2 w-2 rounded-full ${kotakNeoStatus?.connected_today ? "bg-purple-500" : kotakNeoStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                <TabsTrigger value="kotak_neo" className="flex items-center gap-2 text-xs px-3 py-1.5">
+                  <BrokerLogo brokerKey="kotak_neo" className="h-4 w-4" />
                   Kotak Neo
+                  <span className={`h-2 w-2 rounded-full ml-0.5 ${kotakNeoStatus?.connected_today ? "bg-purple-500" : kotakNeoStatus?.configured ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
                 </TabsTrigger>
               )}
               {activeBrokers.includes("angel") && (
-                <TabsTrigger value="angel" className="text-xs px-3 py-1.5 text-muted-foreground">
+                <TabsTrigger value="angel" className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-muted-foreground">
+                  <BrokerLogo brokerKey="angel" className="h-4 w-4 opacity-75" />
                   Angel One <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
                 </TabsTrigger>
               )}
               {activeBrokers.includes("groww") && (
-                <TabsTrigger value="groww" className="text-xs px-3 py-1.5 text-muted-foreground">
+                <TabsTrigger value="groww" className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-muted-foreground">
+                  <BrokerLogo brokerKey="groww" className="h-4 w-4 opacity-75" />
                   Groww <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
                 </TabsTrigger>
               )}
               {activeBrokers.includes("icici") && (
-                <TabsTrigger value="icici" className="text-xs px-3 py-1.5 text-muted-foreground">
+                <TabsTrigger value="icici" className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-muted-foreground">
+                  <BrokerLogo brokerKey="icici" className="h-4 w-4 opacity-75" />
                   ICICI Direct <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
                 </TabsTrigger>
               )}
               {activeBrokers.includes("dhan") && (
-                <TabsTrigger value="dhan" className="text-xs px-3 py-1.5 text-muted-foreground">
+                <TabsTrigger value="dhan" className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-muted-foreground">
+                  <BrokerLogo brokerKey="dhan" className="h-4 w-4 opacity-75" />
                   Dhan <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
                 </TabsTrigger>
               )}
               {activeBrokers.includes("fivepaisa") && (
-                <TabsTrigger value="fivepaisa" className="text-xs px-3 py-1.5 text-muted-foreground">
+                <TabsTrigger value="fivepaisa" className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-muted-foreground">
+                  <BrokerLogo brokerKey="fivepaisa" className="h-4 w-4 opacity-75" />
                   5paisa <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Soon</Badge>
                 </TabsTrigger>
               )}
@@ -811,9 +823,12 @@ function EquityPortfolioAnalysisContent() {
             {/* Zerodha Kite Tab */}
             <TabsContent value="kite" className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-                <div>
-                  <h3 className="font-semibold text-sm">Zerodha Kite Connect</h3>
-                  <p className="text-xs text-muted-foreground">Read-only equity holdings OAuth2 integration for Zerodha</p>
+                <div className="flex items-center gap-2.5">
+                  <BrokerLogo brokerKey="kite" className="h-6 w-6" />
+                  <div>
+                    <h3 className="font-semibold text-sm">Zerodha Kite Connect</h3>
+                    <p className="text-xs text-muted-foreground">Read-only equity holdings OAuth2 integration for Zerodha</p>
+                  </div>
                 </div>
                 {status?.connected_today ? (
                   <Badge variant="outline" className={statusColors.bullish}>Session Active Today</Badge>
@@ -866,9 +881,12 @@ function EquityPortfolioAnalysisContent() {
             {/* Upstox Tab */}
             <TabsContent value="upstox" className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-                <div>
-                  <h3 className="font-semibold text-sm">Upstox API v2</h3>
-                  <p className="text-xs text-muted-foreground">Read-only equity long-term holdings integration for Upstox</p>
+                <div className="flex items-center gap-2.5">
+                  <BrokerLogo brokerKey="upstox" className="h-6 w-6" />
+                  <div>
+                    <h3 className="font-semibold text-sm">Upstox API v2</h3>
+                    <p className="text-xs text-muted-foreground">Read-only equity long-term holdings integration for Upstox</p>
+                  </div>
                 </div>
                 {upstoxStatus?.connected_today ? (
                   <Badge variant="outline" className={statusColors.orange}>Session Active Today</Badge>
@@ -921,12 +939,15 @@ function EquityPortfolioAnalysisContent() {
             {/* Kotak Neo Tab */}
             <TabsContent value="kotak_neo" className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-                <div>
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
-                    Kotak Neo API Connector
-                    <Badge variant="secondary" className="text-[10px] px-1.5">Equity Read-Only</Badge>
-                  </h3>
-                  <p className="text-xs text-muted-foreground">Read-only equity portfolio holdings sync for Kotak Neo accounts</p>
+                <div className="flex items-center gap-2.5">
+                  <BrokerLogo brokerKey="kotak_neo" className="h-6 w-6" />
+                  <div>
+                    <h3 className="font-semibold text-sm flex items-center gap-2">
+                      Kotak Neo API Connector
+                      <Badge variant="secondary" className="text-[10px] px-1.5">Equity Read-Only</Badge>
+                    </h3>
+                    <p className="text-xs text-muted-foreground">Read-only equity portfolio holdings sync for Kotak Neo accounts</p>
+                  </div>
                 </div>
                 {kotakNeoStatus?.connected_today ? (
                   <Badge variant="outline" className={statusColors.caution}>Session Active Today</Badge>
