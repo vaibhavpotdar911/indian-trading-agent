@@ -16,6 +16,7 @@ import {
   runEquityPortfolioReview,
   saveKiteCredentials,
   saveTelegramSettings,
+  saveUpstoxCredentials,
   getKotakNeoStatus,
   saveKotakNeoCredentials,
   loginKotakNeo,
