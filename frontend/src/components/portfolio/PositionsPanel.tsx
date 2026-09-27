@@ -565,7 +565,7 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, kotakNeoConnect
             </TableBody>
           </Table>
         </CardContent>
-
+      </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
