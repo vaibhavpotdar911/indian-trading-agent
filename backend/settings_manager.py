@@ -44,8 +44,8 @@ PROVIDERS_INFO = {
         "name": "Google Gemini",
         "key_format": "AIza...",
         "signup_url": "https://aistudio.google.com/app/apikey",
-        "models_deep": ["gemini-3.1-pro", "gemini-3-pro"],
-        "models_quick": ["gemini-2.5-flash", "gemini-2-flash"],
+        "models_deep": ["gemini-3.8-pro", "gemini-3.5-pro", "gemini-3.1-pro"],
+        "models_quick": ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview"],
     },
     "ollama": {
         "name": "Ollama (Local)",
@@ -153,12 +153,29 @@ def test_api_key(provider: str, key: str | None = None) -> dict:
 
         elif provider == "google":
             from google import genai
-            client = genai.Client(api_key=key)
-            resp = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents="Say hi",
-            )
-            return {"ok": True, "model": "gemini-2.5-flash", "message": "API key works!"}
+            client = genai.Client(api_key=key, http_options={"timeout": 8000})
+            test_model = "gemini-3.8-flash"
+            try:
+                resp = client.models.generate_content(
+                    model=test_model,
+                    contents="Say hi",
+                )
+            except Exception as e:
+                if "404" in str(e) or "NOT_FOUND" in str(e) or "no longer available" in str(e):
+                    # Try listing models dynamically
+                    models = [
+                        m.name.replace("models/", "")
+                        for m in client.models.list()
+                        if hasattr(m, "name") and "gemini" in m.name.lower()
+                    ]
+                    test_model = models[0] if models else "gemini-3.5-flash"
+                    resp = client.models.generate_content(
+                        model=test_model,
+                        contents="Say hi",
+                    )
+                else:
+                    raise e
+            return {"ok": True, "model": test_model, "message": "API key works!"}
 
         else:
             return {"ok": False, "error": f"Testing not implemented for {provider}"}
