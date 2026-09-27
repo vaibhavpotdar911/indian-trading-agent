@@ -133,7 +133,7 @@ def test_api_key(provider: str, key: str | None = None) -> dict:
     try:
         if provider == "anthropic":
             from anthropic import Anthropic
-            client = Anthropic(api_key=key)
+            client = Anthropic(api_key=key, timeout=8.0)
             resp = client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=10,
@@ -143,7 +143,7 @@ def test_api_key(provider: str, key: str | None = None) -> dict:
 
         elif provider == "openai":
             from openai import OpenAI
-            client = OpenAI(api_key=key)
+            client = OpenAI(api_key=key, timeout=8.0)
             resp = client.chat.completions.create(
                 model="gpt-5.4-mini",
                 max_tokens=10,
@@ -153,7 +153,7 @@ def test_api_key(provider: str, key: str | None = None) -> dict:
 
         elif provider == "google":
             from google import genai
-            client = genai.Client(api_key=key)
+            client = genai.Client(api_key=key, http_options={"timeout": 8000})
             resp = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents="Say hi",
