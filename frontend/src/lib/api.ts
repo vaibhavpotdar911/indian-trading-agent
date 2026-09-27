@@ -182,6 +182,12 @@ export const deleteTelegramSettings = () => fetchAPI(`/api/telegram/settings`, {
 export const sendTelegramTest = (text?: string) =>
   fetchAPI(`/api/telegram/test`, { method: "POST", body: JSON.stringify({ text: text || null }) });
 
+// Institutional & Insider Tracker
+export const getInstitutionalSummary = () => fetchAPI(`/api/institutional/summary`);
+export const getBulkDeals = () => fetchAPI(`/api/institutional/bulk-deals`);
+export const getPromoterActivity = () => fetchAPI(`/api/institutional/promoter-activity`);
+export const getDeliveryStats = (ticker: string) => fetchAPI(`/api/institutional/delivery/${ticker}`);
+
 // Positions (local store, synced from Kite on demand)
 export const getPositions = () => fetchAPI(`/api/positions`);
 export const syncPositions = () => fetchAPI(`/api/positions/sync`, { method: "POST" });
