@@ -153,7 +153,7 @@ def test_api_key(provider: str, key: str | None = None) -> dict:
 
         elif provider == "google":
             from google import genai
-            client = genai.Client(api_key=key, http_options={"timeout": 8000})
+            client = genai.Client(api_key=key, http_options={"timeout": 12000})
             test_model = "gemini-3.8-flash"
             try:
                 resp = client.models.generate_content(
