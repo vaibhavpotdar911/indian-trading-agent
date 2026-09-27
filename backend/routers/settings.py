@@ -1,5 +1,6 @@
 """Settings API — manage API keys and LLM provider config from the UI."""
 
+import os
 import json
 import logging
 import urllib.request
@@ -122,3 +123,18 @@ def list_ollama_models():
     except Exception:
         logger.exception("Ollama model discovery failed")
         return {"reachable": False, "models": [], "error": "Ollama is unavailable."}
+
+
+@router.get("/google/models")
+def list_google_models():
+    """List live available Google Gemini models directly from Google GenAI API or catalog."""
+    from backend.db import get_setting
+    api_key = get_setting("api_key_google") or os.environ.get("GOOGLE_API_KEY")
+    from tradingagents.llm_clients.google_client import get_google_live_models
+    res = get_google_live_models(api_key)
+    return {
+        "reachable": True,
+        "quick_models": res.get("quick", []),
+        "deep_models": res.get("deep", []),
+    }
+
