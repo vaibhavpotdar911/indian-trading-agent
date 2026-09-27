@@ -185,14 +185,35 @@ def test_api_key(provider: str, key: str | None = None) -> dict:
         return {"ok": False, "error": "Provider test failed; check backend logs."}
 
 
+OBSOLETE_MODELS = {
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-2-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+}
+
+
+def sanitize_model_name(model: str | None, kind: str = "quick") -> str:
+    """Sanitize obsolete model names to active working models so unusable models are never loaded."""
+    if not model or model.lower() in OBSOLETE_MODELS:
+        return "gemini-3.8-flash" if kind == "quick" else "gemini-3.8-pro"
+    return model
+
+
 def get_llm_config() -> dict:
     """Get current LLM provider and model config (from DB or defaults)."""
     from tradingagents.default_config import DEFAULT_CONFIG
 
+    provider = get_setting("llm_provider") or DEFAULT_CONFIG["llm_provider"]
+    deep = sanitize_model_name(get_setting("deep_think_llm") or DEFAULT_CONFIG["deep_think_llm"], kind="deep")
+    quick = sanitize_model_name(get_setting("quick_think_llm") or DEFAULT_CONFIG["quick_think_llm"], kind="quick")
+
     return {
-        "llm_provider": get_setting("llm_provider") or DEFAULT_CONFIG["llm_provider"],
-        "deep_think_llm": get_setting("deep_think_llm") or DEFAULT_CONFIG["deep_think_llm"],
-        "quick_think_llm": get_setting("quick_think_llm") or DEFAULT_CONFIG["quick_think_llm"],
+        "llm_provider": provider,
+        "deep_think_llm": deep,
+        "quick_think_llm": quick,
     }
 
 
@@ -201,9 +222,9 @@ def save_llm_config(provider: str | None = None, deep_model: str | None = None, 
     if provider is not None:
         set_setting("llm_provider", provider)
     if deep_model is not None:
-        set_setting("deep_think_llm", deep_model)
+        set_setting("deep_think_llm", sanitize_model_name(deep_model, kind="deep"))
     if quick_model is not None:
-        set_setting("quick_think_llm", quick_model)
+        set_setting("quick_think_llm", sanitize_model_name(quick_model, kind="quick"))
 
 
 def apply_llm_config_to_default():
