@@ -8,6 +8,7 @@ interface TradingViewAdvancedChartProps {
   exchange?: "NSE" | "BSE";
   height?: number | string;
   className?: string;
+  onSwitchEngine?: () => void;
 }
 
 export function TradingViewAdvancedChart({
@@ -15,21 +16,23 @@ export function TradingViewAdvancedChart({
   exchange = "NSE",
   height = 780,
   className = "",
+  onSwitchEngine,
 }: TradingViewAdvancedChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
+
+  const cleanTicker = (ticker || "RELIANCE")
+    .replace(/\.NS$/i, "")
+    .replace(/\.BO$/i, "")
+    .toUpperCase();
+  const symbol = `${exchange}:${cleanTicker}`;
+  const tvExternalUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`;
 
   const formattedHeight = typeof height === "number" ? `${height}px` : height;
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Clean ticker for TradingView symbol format (e.g. NSE:RELIANCE, NSE:TMPV)
-    const cleanTicker = (ticker || "RELIANCE")
-      .replace(/\.NS$/i, "")
-      .replace(/\.BO$/i, "")
-      .toUpperCase();
-    const symbol = `${exchange}:${cleanTicker}`;
     const isDark = resolvedTheme === "dark";
 
     // Clear previous widget script/container
@@ -73,18 +76,48 @@ export function TradingViewAdvancedChart({
         containerRef.current.innerHTML = "";
       }
     };
-  }, [ticker, exchange, resolvedTheme]);
+  }, [symbol, resolvedTheme]);
 
   return (
-    <div
-      className={`w-full relative rounded-xl overflow-hidden border border-border bg-card shadow-sm transition-all duration-200 ${className}`}
-      style={{ height: formattedHeight, minHeight: "600px" }}
-    >
+    <div className={`space-y-2 ${className}`}>
+      {/* Exchange Licensing Guidance Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">⚠️ Exchange Licensing Note:</span>
+          <span>
+            TradingView restricts embedded data for certain {exchange} stock scrips. If the chart displays data unavailable:
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {onSwitchEngine && (
+            <button
+              onClick={onSwitchEngine}
+              className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 font-medium transition-colors"
+            >
+              ⚡ Switch to Lightweight Candles
+            </button>
+          )}
+          <a
+            href={tvExternalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center gap-1 transition-colors"
+          >
+            Open {symbol} on TradingView.com ↗
+          </a>
+        </div>
+      </div>
+
       <div
-        ref={containerRef}
-        className="tradingview-widget-container w-full h-full"
-        style={{ height: "100%", width: "100%" }}
-      />
+        className="w-full relative rounded-xl overflow-hidden border border-border bg-card shadow-sm transition-all duration-200"
+        style={{ height: formattedHeight, minHeight: "600px" }}
+      >
+        <div
+          ref={containerRef}
+          className="tradingview-widget-container w-full h-full"
+          style={{ height: "100%", width: "100%" }}
+        />
+      </div>
     </div>
   );
 }

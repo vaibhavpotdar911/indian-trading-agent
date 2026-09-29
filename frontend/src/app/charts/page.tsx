@@ -356,7 +356,12 @@ export default function ChartsPage() {
 
       {/* Main Chart Container */}
       {engine === "tradingview" ? (
-        <TradingViewAdvancedChart ticker={submittedTicker} exchange={exchange} height={chartHeight} />
+        <TradingViewAdvancedChart
+          ticker={submittedTicker}
+          exchange={exchange}
+          height={chartHeight}
+          onSwitchEngine={() => switchEngine("lightweight")}
+        />
       ) : (
         <Card>
           <CardContent className="p-4">
