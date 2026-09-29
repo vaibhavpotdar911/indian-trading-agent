@@ -80,7 +80,7 @@ SUPPORTED_BROKERS: dict[str, dict[str, Any]] = {
 
 
 def get_active_broker_tabs() -> list[dict[str, Any]]:
-    """Return configured active broker tabs saved in SQLite DB."""
+    """Return active broker tabs saved in SQLite DB that are configured or connected."""
     raw = get_setting(ACTIVE_BROKER_TABS_SETTING)
     active_keys = []
     if raw:
@@ -92,10 +92,12 @@ def get_active_broker_tabs() -> list[dict[str, Any]]:
     result = []
     for key in active_keys:
         if key in SUPPORTED_BROKERS:
-            meta = SUPPORTED_BROKERS[key].copy()
             status = get_broker_status(key)
-            meta["status"] = status
-            result.append(meta)
+            # Only include the tab if the user has actually configured credentials or connected
+            if status.get("configured") or status.get("connected_today"):
+                meta = SUPPORTED_BROKERS[key].copy()
+                meta["status"] = status
+                result.append(meta)
 
     return result
 

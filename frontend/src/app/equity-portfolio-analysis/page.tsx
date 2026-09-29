@@ -61,6 +61,21 @@ import { BrokerBadge } from "@/components/brokers/BrokerBadge";
 import { ConfigureBrokerModal } from "@/components/brokers/ConfigureBrokerModal";
 
 
+const BROKER_NAMES: Record<string, string> = {
+  kite: "Zerodha Kite",
+  upstox: "Upstox",
+  kotak_neo: "Kotak Neo",
+  angel_one: "Angel One",
+  fivepaisa: "5Paisa",
+  groww: "Groww",
+};
+
+function formatBrokerName(key: string, name?: string): string {
+  if (name && name.toLowerCase() !== key.toLowerCase()) return name;
+  if (BROKER_NAMES[key.toLowerCase()]) return BROKER_NAMES[key.toLowerCase()];
+  return key.charAt(0).toUpperCase() + key.slice(1).replace("_", " ");
+}
+
 const equityHelp = [
   {
     question: "How do I get holdings into the review?",
@@ -825,7 +840,7 @@ function EquityPortfolioAnalysisContent() {
               <TabsList className="inline-flex h-9 items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground w-full sm:w-auto border border-border mb-4">
                 {brokerTabs.map((key) => {
                   const detail = brokerDetails[key];
-                  const name = detail?.name || (key.charAt(0).toUpperCase() + key.slice(1).replace("_", " "));
+                  const name = formatBrokerName(key, detail?.name);
                   return (
                     <TabsTrigger
                       key={key}
@@ -855,7 +870,7 @@ function EquityPortfolioAnalysisContent() {
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
                       <div>
                         <h3 className="font-bold text-sm flex items-center gap-2">
-                          {detail.name || key}
+                          {formatBrokerName(key, detail?.name)}
                           {bStatus.connected_today ? (
                             <Badge variant="outline" className={statusColors.bullish}>Session Active</Badge>
                           ) : bStatus.configured ? (
