@@ -29,11 +29,11 @@ jobs:
 
       - name: Execute Antigravity Agent
         env:
-          ANTIGRAVITY_API_KEY: ${{ secrets.ANTIGRAVITY_API_KEY }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
-          JIRA_DOMAIN: ${{ secrets.JIRA_DOMAIN }}
-          JIRA_ISSUE_KEY: ${{ github.event.client_payload.issue_key }}
+            ANTIGRAVITY_API_KEY: ${{ secrets.ANTIGRAVITY_API_KEY }}
+            JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+            JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+            JIRA_DOMAIN: ${{ secrets.JIRA_DOMAIN }}
+            JIRA_ISSUE_KEY: ${{ github.event.client_payload.issue_key }}
         run: |
           python - << 'EOF'
           import os
@@ -41,10 +41,20 @@ jobs:
           from google.antigravity import Agent
 
           async def main():
-              issue_key = os.environ["JIRA_ISSUE_KEY"]
+              issue_key = os.environ.get("JIRA_ISSUE_KEY", "KAN-1")
               print(f"Processing Jira Ticket: {issue_key}")
 
-              async with Agent() as agent:
+              # Pass configuration dictionary to Agent
+              config = {
+                  "api_key": os.environ.get("ANTIGRAVITY_API_KEY"),
+                  "jira": {
+                      "token": os.environ.get("JIRA_API_TOKEN"),
+                      "email": os.environ.get("JIRA_EMAIL"),
+                      "domain": os.environ.get("JIRA_DOMAIN"),
+                  }
+              }
+
+              async with Agent(config) as agent:
                   prompt = f"""
                   Fetch details for Jira ticket {issue_key}.
                   1. Create a git branch named 'feature/{issue_key}'.
