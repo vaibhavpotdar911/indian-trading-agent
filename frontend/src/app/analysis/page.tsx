@@ -137,8 +137,21 @@ function AnalysisPageInner() {
 
       {/* Error */}
       {analysis.error && (
-        <Card className="border-red-500/30 bg-red-500/5">
-          <CardContent className="p-4 text-red-400">{analysis.error}</CardContent>
+        <Card className="border-red-500/40 bg-red-500/10 dark:bg-red-950/30">
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center gap-2 text-red-500 font-semibold text-sm">
+              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
+              Analysis Stopped (LLM API Error)
+            </div>
+            <p className="text-sm font-mono text-red-400 break-words whitespace-pre-wrap">
+              {analysis.error}
+            </p>
+            {analysis.error.includes("429") || analysis.error.includes("RESOURCE_EXHAUSTED") ? (
+              <p className="text-xs text-muted-foreground pt-1 border-t border-red-500/20">
+                💡 <strong>Gemini Free Tier Quota Exceeded:</strong> Google Gemini free tier allows up to 5 requests per minute. Wait ~30 seconds before running again, or switch your LLM provider/model in <strong>Settings</strong>.
+              </p>
+            ) : null}
+          </CardContent>
         </Card>
       )}
 

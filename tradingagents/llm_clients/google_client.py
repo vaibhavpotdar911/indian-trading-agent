@@ -49,10 +49,10 @@ def get_google_live_models(api_key: Optional[str] = None) -> dict:
 
 
 class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
-    """ChatGoogleGenerativeAI with normalized content output and automatic 404 model fallback.
+    """ChatGoogleGenerativeAI with normalized content output, 429 rate-limit backoff, and automatic 404 model fallback.
 
     Gemini 3 models return content as list of typed blocks.
-    This normalizes to string and gracefully recovers if an obsolete model returns 404 NOT_FOUND.
+    This normalizes to string and gracefully recovers if rate limited or if an obsolete model returns 404 NOT_FOUND.
     """
 
     def invoke(self, input, config=None, **kwargs):
@@ -60,6 +60,20 @@ class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
             return normalize_content(super().invoke(input, config, **kwargs))
         except Exception as e:
             err_msg = str(e)
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota exceeded" in err_msg:
+                import time
+                logger.warning(
+                    f"[GoogleClient] Rate limit 429 encountered: {err_msg[:120]}. Sleeping 6s before retry..."
+                )
+                time.sleep(6)
+                try:
+                    return normalize_content(super().invoke(input, config, **kwargs))
+                except Exception:
+                    time.sleep(12)
+                    try:
+                        return normalize_content(super().invoke(input, config, **kwargs))
+                    except Exception as inner_e:
+                        raise inner_e
             if "404" in err_msg or "NOT_FOUND" in err_msg or "no longer available" in err_msg:
                 logger.warning(
                     f"[GoogleClient] Model '{self.model}' returned 404/Not Found. Automatically falling back to '{FALLBACK_GOOGLE_FLASH_MODEL}'."
@@ -78,7 +92,7 @@ class GoogleClient(BaseLLMClient):
     def get_llm(self) -> Any:
         """Return configured ChatGoogleGenerativeAI instance."""
         self.warn_if_unknown_model()
-        llm_kwargs = {"model": self.model}
+        llm_kwargs = {"model": self.model, "max_retries": 5}
 
         if self.base_url:
             llm_kwargs["base_url"] = self.base_url
