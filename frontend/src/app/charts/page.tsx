@@ -49,7 +49,6 @@ function getChartOptions(isDark: boolean) {
 export default function ChartsPage() {
   const { resolvedTheme } = useTheme();
   const [engine, setEngine] = useState<ChartEngine>("tradingview");
-  const [exchange, setExchange] = useState<"NSE" | "BSE">("NSE");
   const [chartHeight, setChartHeight] = useState<number | string>(780);
 
   const [ticker, setTicker] = useState("RELIANCE");
@@ -285,28 +284,6 @@ export default function ChartsPage() {
         {engine === "tradingview" ? (
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-medium">Exchange:</span>
-              <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/40 text-xs">
-                <button
-                  onClick={() => setExchange("NSE")}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${
-                    exchange === "NSE" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  NSE
-                </button>
-                <button
-                  onClick={() => setExchange("BSE")}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${
-                    exchange === "BSE" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  BSE
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground font-medium">Height:</span>
               <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/40 text-xs">
                 <button
@@ -356,12 +333,7 @@ export default function ChartsPage() {
 
       {/* Main Chart Container */}
       {engine === "tradingview" ? (
-        <TradingViewAdvancedChart
-          ticker={submittedTicker}
-          exchange={exchange}
-          height={chartHeight}
-          onSwitchEngine={() => switchEngine("lightweight")}
-        />
+        <TradingViewAdvancedChart ticker={submittedTicker} height={chartHeight} />
       ) : (
         <Card>
           <CardContent className="p-4">

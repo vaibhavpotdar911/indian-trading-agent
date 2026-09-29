@@ -1,33 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 
 interface TradingViewAdvancedChartProps {
   ticker: string;
-  exchange?: "NSE" | "BSE";
   height?: number | string;
   className?: string;
-  onSwitchEngine?: () => void;
 }
 
 export function TradingViewAdvancedChart({
   ticker,
-  exchange: initialExchange = "NSE",
   height = 780,
   className = "",
-  onSwitchEngine,
 }: TradingViewAdvancedChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
-  const [exchange, setExchange] = useState<"NSE" | "BSE">(initialExchange);
   const widgetIdRef = useRef<string>(`tv_chart_${Math.random().toString(36).substring(2, 9)}`);
 
   const cleanTicker = (ticker || "RELIANCE")
     .replace(/\.NS$/i, "")
     .replace(/\.BO$/i, "")
     .toUpperCase();
-  const symbol = `${exchange}:${cleanTicker}`;
+  const symbol = `BSE:${cleanTicker}`;
 
   const formattedHeight = typeof height === "number" ? `${height}px` : height;
 
@@ -37,7 +32,6 @@ export function TradingViewAdvancedChart({
     const isDark = resolvedTheme === "dark";
     const containerId = widgetIdRef.current;
 
-    // Clear previous widget
     containerRef.current.innerHTML = `<div id="${containerId}" style="height: 100%; width: 100%;"></div>`;
 
     const initWidget = () => {
@@ -98,56 +92,15 @@ export function TradingViewAdvancedChart({
   }, [symbol, resolvedTheme]);
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {/* Top Toolbar inside integration */}
-      <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-border bg-card shadow-sm text-xs">
-        <div className="flex items-center gap-2 font-medium">
-          <span className="text-muted-foreground">Exchange Feed:</span>
-          <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/40">
-            <button
-              onClick={() => setExchange("NSE")}
-              className={`px-2.5 py-0.5 rounded font-semibold transition-colors ${
-                exchange === "NSE"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              NSE ({cleanTicker})
-            </button>
-            <button
-              onClick={() => setExchange("BSE")}
-              className={`px-2.5 py-0.5 rounded font-semibold transition-colors ${
-                exchange === "BSE"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              BSE ({cleanTicker})
-            </button>
-          </div>
-        </div>
-
-        {onSwitchEngine && (
-          <button
-            onClick={onSwitchEngine}
-            className="px-2.5 py-1 rounded-lg border border-border bg-muted/50 hover:bg-muted font-medium transition-colors text-muted-foreground hover:text-foreground"
-          >
-            Switch to Lightweight Engine
-          </button>
-        )}
-      </div>
-
-      {/* Full Embedded TradingView Container */}
+    <div
+      className={`w-full relative rounded-xl overflow-hidden border border-border bg-card shadow-sm transition-all duration-200 ${className}`}
+      style={{ height: formattedHeight, minHeight: "600px" }}
+    >
       <div
-        className="w-full relative rounded-xl overflow-hidden border border-border bg-card shadow-sm transition-all duration-200"
-        style={{ height: formattedHeight, minHeight: "600px" }}
-      >
-        <div
-          ref={containerRef}
-          className="tradingview-widget-container w-full h-full"
-          style={{ height: "100%", width: "100%" }}
-        />
-      </div>
+        ref={containerRef}
+        className="tradingview-widget-container w-full h-full"
+        style={{ height: "100%", width: "100%" }}
+      />
     </div>
   );
 }
