@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { runAnalysis, connectAnalysisWS } from "@/lib/api";
+import { runAnalysis, connectAnalysisWS, getAnalysisResult } from "@/lib/api";
 import type { WSEvent } from "@/lib/types";
 
 interface AnalysisOptions {
@@ -34,6 +34,7 @@ interface AnalysisState {
   error: string | null;
   duration: number | null;
   ws: WebSocket | null;
+  pollInterval: any | null;
   heartbeat: string;
   lastUpdateAt: number;
   stats: AnalysisStats | null;
@@ -54,15 +55,20 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   error: null,
   duration: null,
   ws: null,
+  pollInterval: null,
   heartbeat: "",
   lastUpdateAt: 0,
   stats: null,
 
   start: async (ticker: string, tradeDate: string, options: AnalysisOptions = {}) => {
-    // Close existing WS if any
+    // Close existing WS & timer if any
     const existingWs = get().ws;
     if (existingWs) {
       try { existingWs.close(); } catch {}
+    }
+    const existingTimer = get().pollInterval;
+    if (existingTimer) {
+      clearInterval(existingTimer);
     }
 
     set({
@@ -77,6 +83,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       error: null,
       duration: null,
       ws: null,
+      pollInterval: null,
       heartbeat: "Initializing pipeline...",
       lastUpdateAt: Date.now(),
       stats: null,
@@ -128,10 +135,12 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
             break;
           case "complete":
             ws.close();
+            if (get().pollInterval) clearInterval(get().pollInterval);
             set({
               status: "completed",
               duration: event.duration_seconds ?? null,
               ws: null,
+              pollInterval: null,
               heartbeat: "Complete",
               stats: event.stats
                 ? {
@@ -149,12 +158,65 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
             break;
           case "error":
             ws.close();
-            set({ status: "error", error: event.message ?? "Unknown error", ws: null });
+            if (get().pollInterval) clearInterval(get().pollInterval);
+            set({ status: "error", error: event.message ?? "Unknown error", ws: null, pollInterval: null });
             break;
         }
       });
 
-      set({ taskId, ws });
+      // Polling fallback every 3 seconds to catch status if WS drops
+      const pollTimer = setInterval(async () => {
+        if (get().status !== "running") {
+          clearInterval(pollTimer);
+          return;
+        }
+        try {
+          const res: any = await getAnalysisResult(taskId);
+          if (res.status === "error") {
+            if (get().pollInterval) clearInterval(get().pollInterval);
+            const currentWs = get().ws;
+            if (currentWs) try { currentWs.close(); } catch {}
+            set({ status: "error", error: res.error || "Analysis failed", ws: null, pollInterval: null });
+          } else if (res.status === "completed" || res.signal || res.market_report) {
+            if (get().pollInterval) clearInterval(get().pollInterval);
+            const currentWs = get().ws;
+            if (currentWs) try { currentWs.close(); } catch {}
+            const state = get();
+            set({
+              status: "completed",
+              signal: res.signal || state.signal,
+              duration: res.duration_seconds ?? state.duration,
+              reports: {
+                ...state.reports,
+                market_report: res.market_report || state.reports.market_report,
+                sentiment_report: res.sentiment_report || state.reports.sentiment_report,
+                news_report: res.news_report || state.reports.news_report,
+                fundamentals_report: res.fundamentals_report || state.reports.fundamentals_report,
+                investment_plan: res.investment_plan || state.reports.investment_plan,
+                trader_investment_plan: res.trader_investment_plan || state.reports.trader_investment_plan,
+                final_trade_decision: res.final_trade_decision || state.reports.final_trade_decision,
+              },
+              debates: {
+                bull: res.bull_history || state.debates.bull,
+                bear: res.bear_history || state.debates.bear,
+              },
+              riskDebates: {
+                aggressive: res.risk_aggressive_history || state.riskDebates.aggressive,
+                conservative: res.risk_conservative_history || state.riskDebates.conservative,
+                neutral: res.risk_neutral_history || state.riskDebates.neutral,
+              },
+              stats: res.stats || state.stats,
+              ws: null,
+              pollInterval: null,
+              heartbeat: "Complete",
+            });
+          }
+        } catch {
+          // Ignore network errors in polling fallback
+        }
+      }, 3000);
+
+      set({ taskId, ws, pollInterval: pollTimer });
     } catch (e: any) {
       set({ status: "error", error: e.message });
     }
@@ -164,6 +226,10 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     const ws = get().ws;
     if (ws) {
       try { ws.close(); } catch {}
+    }
+    const timer = get().pollInterval;
+    if (timer) {
+      clearInterval(timer);
     }
     set({
       taskId: null,
@@ -177,9 +243,11 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       error: null,
       duration: null,
       ws: null,
+      pollInterval: null,
       heartbeat: "",
       lastUpdateAt: 0,
       stats: null,
     });
   },
 }));
+

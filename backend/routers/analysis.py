@@ -21,6 +21,7 @@ _tasks: dict[str, dict] = {}
 def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict, selected_analysts: list[str] = None):
     """Run the trading agent analysis in a background thread."""
     import asyncio
+    import traceback
     from tradingagents.graph.trading_graph import TradingAgentsGraph
     from tradingagents.graph.propagation import Propagator
     from backend.stats_callback import StatsCallback
@@ -35,6 +36,13 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
     stats = StatsCallback()
 
     try:
+        # Immediate initial heartbeat so frontend is notified right away
+        loop.run_until_complete(manager.send_event(task_id, {
+            "type": "heartbeat",
+            "chunk": 0,
+            "last_activity": "Initializing multi-agent pipeline and market data...",
+        }))
+
         ta = TradingAgentsGraph(
             selected_analysts=selected_analysts,
             debug=False,
@@ -169,10 +177,13 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
         _tasks[task_id]["result"] = result_data
 
     except Exception as e:
+        traceback.print_exc()
+        err_msg = str(e) or "An unknown error occurred during analysis graph execution"
+        print(f"[Analysis {task_id}] Execution Error: {err_msg}", flush=True)
         _tasks[task_id]["status"] = "error"
-        _tasks[task_id]["error"] = str(e)
+        _tasks[task_id]["error"] = err_msg
         loop.run_until_complete(manager.send_event(task_id, {
-            "type": "error", "message": str(e),
+            "type": "error", "message": err_msg,
         }))
     finally:
         loop.close()
@@ -231,6 +242,8 @@ def get_analysis_result(task_id: str):
         task = _tasks[task_id]
         if task["status"] == "completed":
             return task.get("result", {})
+        elif task["status"] == "error":
+            return {"task_id": task_id, "status": "error", "error": task.get("error", "Unknown error")}
         return {"task_id": task_id, "status": task["status"]}
 
     # Check DB
