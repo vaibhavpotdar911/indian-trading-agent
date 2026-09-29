@@ -21,8 +21,8 @@ function getWebSocketBase(): string {
   const apiBase = getApiBase();
   const base = apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
   const url = new URL(base);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  return url.origin;
+  const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${url.host}`;
 }
 
 function notifyAuthRequired() {
