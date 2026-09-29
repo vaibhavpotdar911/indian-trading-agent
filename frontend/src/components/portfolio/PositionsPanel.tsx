@@ -33,7 +33,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { statusColors } from "@/lib/status-colors";
-import { BrokerLogo } from "@/components/brokers/BrokerLogos";
+import { BrokerBadge } from "@/components/brokers/BrokerBadge";
 
 export type Position = {
   tradingsymbol: string;
@@ -507,29 +507,7 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, kotakNeoConnect
                   <TableRow key={`${p.exchange}-${p.tradingsymbol}`}>
                     <TableCell className="font-medium">{p.tradingsymbol}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`inline-flex items-center gap-1.5 ${
-                          p.source === "kite"
-                            ? statusColors.info
-                            : p.source === "upstox"
-                            ? statusColors.orange
-                            : p.source === "kotak_neo"
-                            ? statusColors.caution
-                            : statusColors.neutral
-                        }`}
-                      >
-                        {p.source && p.source !== "manual" ? (
-                          <BrokerLogo brokerKey={p.source} className="h-3 w-3" />
-                        ) : null}
-                        {p.source === "kite"
-                          ? "KITE"
-                          : p.source === "upstox"
-                          ? "UPSTOX"
-                          : p.source === "kotak_neo"
-                          ? "KOTAK NEO"
-                          : "MANUAL"}
-                      </Badge>
+                      <BrokerBadge brokerKey={p.source || "manual"} size="xs" />
                     </TableCell>
                     <TableCell className="text-right">{p.quantity}</TableCell>
                     <TableCell className="text-right">{money(p.average_price)}</TableCell>

@@ -78,6 +78,8 @@ app.include_router(equity_portfolio_router.router)
 app.include_router(positions_router.router)
 app.include_router(telegram_router.router)
 app.include_router(institutional_router.router)
+from backend.routers import brokers as brokers_router
+app.include_router(brokers_router.router)
 
 
 @app.get("/api/health")
