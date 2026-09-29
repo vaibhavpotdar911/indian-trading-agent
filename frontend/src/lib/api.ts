@@ -6,13 +6,14 @@ function getApiBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "");
   if (configured) return configured;
 
-  // Keep the existing local two-process workflow usable without exposing any
-  // credential or host-specific deployment setting in the browser bundle.
-  if (typeof window !== "undefined" && ["localhost", "127.0.0.1", "::1", "[::1]"].includes(window.location.hostname)) {
+  if (typeof window !== "undefined") {
     const hostname = window.location.hostname.includes(":")
       ? `[${window.location.hostname.replace(/^\[|\]$/g, "")}]`
       : window.location.hostname;
-    return `${window.location.protocol}//${hostname}:8000`;
+    // Next.js dev server runs on port 3000, while FastAPI backend runs on 8000.
+    const port = window.location.port === "3000" ? "8000" : (window.location.port || "");
+    const portSuffix = port ? `:${port}` : "";
+    return `${window.location.protocol}//${hostname}${portSuffix}`;
   }
   return "";
 }

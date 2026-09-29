@@ -172,7 +172,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
         }
         try {
           const res: any = await getAnalysisResult(taskId);
-          if (res.status === "error") {
+          if (res.status === "error" || (res.error && res.error !== "Analysis not found")) {
             if (get().pollInterval) clearInterval(get().pollInterval);
             const currentWs = get().ws;
             if (currentWs) try { currentWs.close(); } catch {}
