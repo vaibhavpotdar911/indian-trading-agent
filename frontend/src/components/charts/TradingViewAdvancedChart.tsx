@@ -6,16 +6,20 @@ import { useTheme } from "next-themes";
 interface TradingViewAdvancedChartProps {
   ticker: string;
   exchange?: "NSE" | "BSE";
-  height?: number;
+  height?: number | string;
+  className?: string;
 }
 
 export function TradingViewAdvancedChart({
   ticker,
   exchange = "NSE",
-  height = 650,
+  height = 780,
+  className = "",
 }: TradingViewAdvancedChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
+
+  const formattedHeight = typeof height === "number" ? `${height}px` : height;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -33,7 +37,7 @@ export function TradingViewAdvancedChart({
 
     const widgetWrapper = document.createElement("div");
     widgetWrapper.className = "tradingview-widget-container__widget";
-    widgetWrapper.style.height = `${height}px`;
+    widgetWrapper.style.height = "100%";
     widgetWrapper.style.width = "100%";
 
     const script = document.createElement("script");
@@ -69,15 +73,19 @@ export function TradingViewAdvancedChart({
         containerRef.current.innerHTML = "";
       }
     };
-  }, [ticker, exchange, resolvedTheme, height]);
+  }, [ticker, exchange, resolvedTheme]);
 
   return (
-    <div className="w-full relative rounded-xl overflow-hidden border border-border bg-card shadow-sm">
+    <div
+      className={`w-full relative rounded-xl overflow-hidden border border-border bg-card shadow-sm transition-all duration-200 ${className}`}
+      style={{ height: formattedHeight, minHeight: "600px" }}
+    >
       <div
         ref={containerRef}
-        className="tradingview-widget-container w-full"
-        style={{ height: `${height}px` }}
+        className="tradingview-widget-container w-full h-full"
+        style={{ height: "100%", width: "100%" }}
       />
     </div>
   );
 }
+
