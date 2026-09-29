@@ -822,35 +822,27 @@ function EquityPortfolioAnalysisContent() {
             </div>
           ) : (
             <Tabs value={activeBrokerTab} onValueChange={setActiveBrokerTab} className="w-full">
-              <TabsList className="flex flex-wrap gap-1.5 w-full mb-4 bg-muted/50 p-1.5 h-auto">
+              <TabsList className="inline-flex h-9 items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground w-full sm:w-auto border border-border mb-4">
                 {brokerTabs.map((key) => {
                   const detail = brokerDetails[key];
-                  const isConnected = detail?.status?.connected_today;
-                  const isConfigured = detail?.status?.configured;
+                  const name = detail?.name || (key.charAt(0).toUpperCase() + key.slice(1).replace("_", " "));
                   return (
                     <TabsTrigger
                       key={key}
                       value={key}
-                      className="flex items-center gap-2 text-xs px-3 py-1.5 data-[state=active]:bg-background"
+                      className="px-4 py-1.5 text-xs font-semibold transition-all rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs"
                     >
-                      <BrokerBadge brokerKey={key} size="xs" />
-                      <span className="font-semibold">{detail?.name || key}</span>
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          isConnected ? "bg-emerald-500" : isConfigured ? "bg-blue-500" : "bg-muted-foreground/30"
-                        }`}
-                        title={isConnected ? "Session Active" : isConfigured ? "Configured" : "Not Set"}
-                      />
+                      {name}
                     </TabsTrigger>
                   );
                 })}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-xs border border-dashed text-muted-foreground hover:text-foreground"
+                  className="h-7 text-xs border border-dashed text-muted-foreground hover:text-foreground ml-1"
                   onClick={() => handleOpenConfigureModal()}
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                  <Plus className="h-3 w-3 mr-1" /> Add Broker
                 </Button>
               </TabsList>
 
@@ -861,25 +853,22 @@ function EquityPortfolioAnalysisContent() {
                   <TabsContent key={key} value={key} className="space-y-4">
                     {/* Header inside tab */}
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-                      <div className="flex items-center gap-3">
-                        <BrokerBadge brokerKey={key} size="md" />
-                        <div>
-                          <h3 className="font-bold text-sm flex items-center gap-2">
-                            {detail.name || key}
-                            {bStatus.connected_today ? (
-                              <Badge variant="outline" className={statusColors.bullish}>Session Active</Badge>
-                            ) : bStatus.configured ? (
-                              <Badge variant="outline" className={statusColors.info}>Configured</Badge>
-                            ) : (
-                              <Badge variant="outline" className={statusColors.neutral}>Credentials Required</Badge>
-                            )}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            {detail.auth_type === "oauth2"
-                              ? "OAuth2 read-only equity holdings integration"
-                              : "API key read-only holdings connector"}
-                          </p>
-                        </div>
+                      <div>
+                        <h3 className="font-bold text-sm flex items-center gap-2">
+                          {detail.name || key}
+                          {bStatus.connected_today ? (
+                            <Badge variant="outline" className={statusColors.bullish}>Session Active</Badge>
+                          ) : bStatus.configured ? (
+                            <Badge variant="outline" className={statusColors.info}>Configured</Badge>
+                          ) : (
+                            <Badge variant="outline" className={statusColors.neutral}>Credentials Required</Badge>
+                          )}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {detail.auth_type === "oauth2"
+                            ? "OAuth2 read-only equity holdings integration"
+                            : "API key read-only holdings connector"}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button

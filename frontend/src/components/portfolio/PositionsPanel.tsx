@@ -507,7 +507,21 @@ export function PositionsPanel({ kiteConnected, upstoxConnected, kotakNeoConnect
                   <TableRow key={`${p.exchange}-${p.tradingsymbol}`}>
                     <TableCell className="font-medium">{p.tradingsymbol}</TableCell>
                     <TableCell>
-                      <BrokerBadge brokerKey={p.source || "manual"} size="xs" />
+                      <Badge variant="outline" className="text-[10px] uppercase font-mono tracking-wider font-semibold">
+                        {p.source === "kite"
+                          ? "Kite"
+                          : p.source === "upstox"
+                          ? "Upstox"
+                          : p.source === "kotak_neo"
+                          ? "Kotak"
+                          : p.source === "angel_one"
+                          ? "Angel"
+                          : p.source === "fivepaisa"
+                          ? "5Paisa"
+                          : p.source === "groww"
+                          ? "Groww"
+                          : "Manual"}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">{p.quantity}</TableCell>
                     <TableCell className="text-right">{money(p.average_price)}</TableCell>
