@@ -148,9 +148,22 @@ function AnalysisPageInner() {
             <p className="text-sm font-mono text-red-400 break-words whitespace-pre-wrap">
               {analysis.error}
             </p>
-            {analysis.error.includes("429") || analysis.error.includes("RESOURCE_EXHAUSTED") ? (
+            {analysis.error.includes("GenerateRequestsPerDay") || analysis.error.includes("requests_free_tier") || analysis.error.includes("limit: 20") ? (
+              <div className="text-xs text-muted-foreground pt-2 border-t border-red-500/20 space-y-1">
+                <p className="font-semibold text-red-300">
+                  💡 Google Free Tier Daily Limit Reached (20 Requests/Day limit on this model):
+                </p>
+                <p>
+                  Unbilled Google AI Studio keys cap free models at <strong>20 requests per day</strong>. Since one multi-agent analysis executes ~15 LLM calls across all agents, a single run exhausts the daily quota for that specific model.
+                </p>
+                <div className="pt-1 flex flex-col gap-1 font-sans">
+                  <span>• <strong>Option 1 (Instant & Free):</strong> Go to <a href="/settings" className="text-primary underline">Settings</a> and select a different model (e.g., <code className="bg-muted px-1 py-0.5 rounded text-[11px]">gemini-2.5-flash</code> or <code className="bg-muted px-1 py-0.5 rounded text-[11px]">gemini-3.8-flash</code>). Each model has its own separate daily free quota!</span>
+                  <span>• <strong>Option 2 (No Daily Limit):</strong> Add a payment method to your Google AI Studio account. Paid billing upgrades your limit to <strong>1,000 requests per minute with NO daily request cap</strong>.</span>
+                </div>
+              </div>
+            ) : analysis.error.includes("429") || analysis.error.includes("RESOURCE_EXHAUSTED") ? (
               <p className="text-xs text-muted-foreground pt-1 border-t border-red-500/20">
-                💡 <strong>Gemini Free Tier Quota Exceeded:</strong> Google Gemini free tier allows up to 5 requests per minute. Wait ~30 seconds before running again, or switch your LLM provider/model in <strong>Settings</strong>.
+                💡 <strong>Gemini Rate Limit Exceeded:</strong> Google Gemini rate limit reached. Wait ~30-60 seconds before retrying, or switch your LLM model in <a href="/settings" className="text-primary underline">Settings</a>.
               </p>
             ) : null}
           </CardContent>

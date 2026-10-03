@@ -63,7 +63,9 @@ class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota exceeded" in err_msg:
                 try:
                     from backend.quota_tracker import quota_tracker
-                    quota_tracker.record_429("google", 30)
+                    is_daily = "GenerateRequestsPerDay" in err_msg or "requests_free_tier" in err_msg
+                    cooldown = 3600 if is_daily else 30
+                    quota_tracker.record_429("google", cooldown_seconds=cooldown)
                 except Exception:
                     pass
 
