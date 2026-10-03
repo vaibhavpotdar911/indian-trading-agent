@@ -87,6 +87,14 @@ class StatsCallback(BaseCallbackHandler):
             self.tokens_in += int(input_tokens or 0)
             self.tokens_out += int(output_tokens or 0)
 
+            # Record call in quota_tracker
+            try:
+                from backend.quota_tracker import quota_tracker
+                provider = "google" if "gemini" in model_name.lower() else "llm"
+                quota_tracker.record_call(provider, model_name or "gemini-3.8-flash", int(input_tokens or 0), int(output_tokens or 0))
+            except Exception:
+                pass
+
             # Track per-model breakdown
             if model_name:
                 if model_name not in self.per_model_tokens:

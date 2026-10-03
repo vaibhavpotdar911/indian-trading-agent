@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LLMSettings } from "@/components/settings/LLMSettings";
+import { QuotaWidget } from "@/components/QuotaWidget";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { statusColors } from "@/lib/status-colors";
 
@@ -63,6 +64,8 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-sm text-muted-foreground">Manage API keys, LLM provider, and view current configuration</p>
       </div>
+
+      <QuotaWidget />
 
       <Card>
         <CardHeader className="pb-3">

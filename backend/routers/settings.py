@@ -159,3 +159,15 @@ def list_google_models():
         "deep_models": res.get("deep", []),
     }
 
+
+@router.get("/quota")
+def get_quota_status():
+    """Get live Gemini / LLM quota and rate limit status."""
+    from backend.quota_tracker import quota_tracker
+    from backend.settings_manager import get_llm_config
+    config = get_llm_config()
+    provider = config.get("llm_provider", "google")
+    model = config.get("quick_think_llm", "gemini-3.8-flash")
+    return quota_tracker.get_status(provider=provider, model=model)
+
+

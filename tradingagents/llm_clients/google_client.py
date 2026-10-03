@@ -61,6 +61,12 @@ class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
         except Exception as e:
             err_msg = str(e)
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota exceeded" in err_msg:
+                try:
+                    from backend.quota_tracker import quota_tracker
+                    quota_tracker.record_429("google", 30)
+                except Exception:
+                    pass
+
                 import time
                 logger.warning(
                     f"[GoogleClient] Rate limit 429 encountered: {err_msg[:120]}. Sleeping 6s before retry..."

@@ -18,6 +18,7 @@ import { analysisHelp } from "@/lib/help-content";
 import { Loader2, Play, RotateCcw, History, Calculator } from "lucide-react";
 import { NextStep } from "@/components/NextStep";
 import { PositionSizeCalculator } from "@/components/PositionSizeCalculator";
+import { QuotaWidget } from "@/components/QuotaWidget";
 
 export default function AnalysisPage() {
   return (
@@ -62,12 +63,13 @@ function AnalysisPageInner() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Run Analysis</h1>
           <p className="text-sm text-muted-foreground">Multi-agent AI analysis for Indian market stocks</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <QuotaWidget compact />
           <Button variant="outline" size="sm" onClick={() => setCalcOpen(true)}>
             <Calculator className="h-3 w-3 mr-2" />
             Position Calc

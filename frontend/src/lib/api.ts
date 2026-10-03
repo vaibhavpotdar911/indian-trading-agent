@@ -255,6 +255,7 @@ export const saveLLMSettings = (data: { llm_provider?: string; deep_think_llm?: 
   });
 export const getProviders = () => fetchAPI(`/api/settings/providers`);
 export const getOllamaModels = () => fetchAPI(`/api/settings/ollama/models`);
+export const getQuotaStatus = () => fetchAPI(`/api/settings/quota`);
 
 // Learning Insights
 export const getLearningInsights = () => fetchAPI(`/api/insights/`);
