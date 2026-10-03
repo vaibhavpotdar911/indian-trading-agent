@@ -161,7 +161,7 @@ export function RecentAnalyses() {
 
       {/* Quick Preview Modal */}
       <Dialog open={!!selectedTaskId} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card/95 backdrop-blur-xl border border-border/60 shadow-2xl p-6">
+        <DialogContent className="sm:max-w-6xl w-[95vw] max-h-[92vh] h-[90vh] overflow-y-auto bg-card/95 backdrop-blur-xl border border-border/60 shadow-2xl p-6 md:p-8">
           <DialogHeader className="pb-4 border-b border-border/40">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-6">
               <div>

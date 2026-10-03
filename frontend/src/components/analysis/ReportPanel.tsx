@@ -65,9 +65,9 @@ export function ReportPanel({ reports }: Props) {
       {availableTabs.map((tab) => (
         <TabsContent key={tab.key} value={tab.key} className="mt-3">
           <Card className="border border-border/50 bg-card/70 backdrop-blur-sm shadow-md">
-            <CardContent className="p-5">
-              <ScrollArea className="h-[380px] pr-4">
-                <div className="prose prose-sm dark:prose-invert max-w-none space-y-3 leading-relaxed text-foreground/90">
+            <CardContent className="p-6">
+              <ScrollArea className="h-[550px] pr-4">
+                <div className="prose prose-sm dark:prose-invert max-w-none space-y-4 leading-relaxed text-foreground/90 text-sm">
                   <ReactMarkdown>{reports[tab.key] || ""}</ReactMarkdown>
                 </div>
               </ScrollArea>
