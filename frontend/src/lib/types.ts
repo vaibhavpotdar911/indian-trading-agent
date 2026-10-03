@@ -67,7 +67,16 @@ export interface AnalysisResult {
   risk_aggressive_history?: string;
   risk_conservative_history?: string;
   risk_neutral_history?: string;
-  stats?: Record<string, number>;
+  stats?: {
+    llm_calls: number;
+    tool_calls: number;
+    tokens_in: number;
+    tokens_out: number;
+    total_tokens: number;
+    cost_usd: number;
+    cost_inr: number;
+    per_model?: Record<string, { input: number; output: number }>;
+  };
   duration_seconds?: number;
   created_at?: string;
 }
