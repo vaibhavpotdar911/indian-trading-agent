@@ -74,15 +74,21 @@ class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
 
                 # If daily model quota reached (e.g. 20 RPD cap), attempt model fallback automatically
                 if is_daily:
+                    api_key = getattr(self, "google_api_key", None) or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
                     for fb_model in fallbacks:
                         if fb_model != self.model:
                             logger.warning(
-                                f"[GoogleClient] Daily free quota reached for '{self.model}'. Auto-switching to '{fb_model}'..."
+                                f"[GoogleClient] Daily free quota reached for '{self.model}'. Instantiating fallback model '{fb_model}'..."
                             )
-                            self.model = fb_model
                             try:
-                                return normalize_content(super().invoke(input, config, **kwargs))
-                            except Exception:
+                                fallback_client = ChatGoogleGenerativeAI(
+                                    model=fb_model,
+                                    google_api_key=api_key,
+                                    max_retries=3,
+                                )
+                                return normalize_content(fallback_client.invoke(input, config, **kwargs))
+                            except Exception as fb_e:
+                                logger.warning(f"[GoogleClient] Fallback model '{fb_model}' failed: {fb_e}")
                                 continue
 
                 # Progressive retry backoff for minute rate limits
@@ -100,8 +106,13 @@ class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
                 logger.warning(
                     f"[GoogleClient] Model '{self.model}' returned 404/Not Found. Automatically falling back to '{FALLBACK_GOOGLE_FLASH_MODEL}'."
                 )
-                self.model = FALLBACK_GOOGLE_FLASH_MODEL
-                return normalize_content(super().invoke(input, config, **kwargs))
+                api_key = getattr(self, "google_api_key", None) or os.environ.get("GOOGLE_API_KEY")
+                fallback_client = ChatGoogleGenerativeAI(
+                    model=FALLBACK_GOOGLE_FLASH_MODEL,
+                    google_api_key=api_key,
+                    max_retries=3,
+                )
+                return normalize_content(fallback_client.invoke(input, config, **kwargs))
             raise e
 
 
