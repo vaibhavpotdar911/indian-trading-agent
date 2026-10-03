@@ -60,20 +60,20 @@ export default function HistoryPage() {
   const winRate = closedTrades.length > 0 ? Math.round((wins / closedTrades.length) * 100) : 0;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">My Trades</h1>
-          <p className="text-sm text-muted-foreground">Past analyses with P&L tracking and agent learning</p>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">My Trades</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Past analyses with P&L tracking and agent learning</p>
         </div>
         {memoryStats && memoryStats.total > 0 && (
           <Card className="border-blue-200 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/20">
-            <CardContent className="px-4 py-3 flex items-center gap-3">
-              <Brain className="h-5 w-5 text-blue-600" />
+            <CardContent className="px-3 py-2 sm:px-4 sm:py-3 flex items-center gap-3">
+              <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
               <div>
-                <p className="text-xs text-blue-700 font-medium">Agent Memory</p>
-                <p className="text-sm">
-                  <span className="font-semibold">{memoryStats.total}</span> lessons learned from past trades
+                <p className="text-[11px] sm:text-xs text-blue-700 font-medium">Agent Memory</p>
+                <p className="text-xs sm:text-sm">
+                  <span className="font-semibold">{memoryStats.total}</span> lessons learned
                 </p>
               </div>
             </CardContent>
@@ -83,50 +83,50 @@ export default function HistoryPage() {
 
       {/* P&L Summary */}
       {closedTrades.length > 0 && (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
           <Card>
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-3 sm:p-4 text-center">
               <p className="text-xs text-muted-foreground">Win Rate</p>
-              <p className="text-xl font-bold">{winRate}%</p>
-              <p className="text-xs text-muted-foreground">{wins}W / {losses}L</p>
+              <p className="text-lg sm:text-xl font-bold">{winRate}%</p>
+              <p className="text-[11px] text-muted-foreground">{wins}W / {losses}L</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-3 sm:p-4 text-center">
               <p className="text-xs text-muted-foreground">Avg Return</p>
-              <p className={`text-xl font-bold ${totalPnl / closedTrades.length >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <p className={`text-lg sm:text-xl font-bold ${totalPnl / closedTrades.length >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {(totalPnl / closedTrades.length).toFixed(2)}%
               </p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-3 sm:p-4 text-center">
               <p className="text-xs text-muted-foreground">Total P&L %</p>
-              <p className={`text-xl font-bold ${totalPnl >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <p className={`text-lg sm:text-xl font-bold ${totalPnl >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)}%
               </p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-3 sm:p-4 text-center">
               <p className="text-xs text-muted-foreground">Closed Trades</p>
-              <p className="text-xl font-bold">{closedTrades.length}</p>
-              {openTrades.length > 0 && <p className="text-xs text-muted-foreground">{openTrades.length} open</p>}
+              <p className="text-lg sm:text-xl font-bold">{closedTrades.length}</p>
+              {openTrades.length > 0 && <p className="text-[11px] text-muted-foreground">{openTrades.length} open</p>}
             </CardContent>
           </Card>
         </div>
       )}
 
       <Tabs defaultValue="all">
-        <TabsList>
-          <TabsTrigger value="all">All ({analyses.length})</TabsTrigger>
-          <TabsTrigger value="open">
+        <TabsList className="w-full flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="all" className="text-xs">All ({analyses.length})</TabsTrigger>
+          <TabsTrigger value="open" className="text-xs">
             <Clock className="h-3 w-3 mr-1" /> Open ({openTrades.length})
           </TabsTrigger>
-          <TabsTrigger value="closed">
+          <TabsTrigger value="closed" className="text-xs">
             <CheckCircle2 className="h-3 w-3 mr-1" /> Closed ({closedTrades.length})
           </TabsTrigger>
-          <TabsTrigger value="untracked">Untracked ({untracked.length})</TabsTrigger>
+          <TabsTrigger value="untracked" className="text-xs">Untracked ({untracked.length})</TabsTrigger>
         </TabsList>
 
         {[
@@ -136,8 +136,8 @@ export default function HistoryPage() {
           { key: "untracked", data: untracked, emptyMsg: "All analyses are tracked!" },
         ].map((tab) => (
           <TabsContent key={tab.key} value={tab.key}>
-            <Card>
-              <CardContent className="p-0">
+            <Card className="overflow-hidden">
+              <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

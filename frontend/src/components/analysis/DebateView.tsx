@@ -49,15 +49,15 @@ export function DebateView({ bull, bear, riskAggressive, riskConservative, riskN
       {hasInvestDebate && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Swords className="h-4 w-4" /> Investment Debate
+            <CardTitle className="text-sm flex items-center gap-2 font-semibold">
+              <Swords className="h-4 w-4 text-primary" /> Investment Debate
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px]">
-              <div className="grid grid-cols-2 gap-3">
-                <DebateMessage content={bull} side="Bull" icon={TrendingUp} color="border-green-500/20 bg-green-500/5" />
-                <DebateMessage content={bear} side="Bear" icon={TrendingDown} color="border-red-500/20 bg-red-500/5" />
+            <ScrollArea className="h-[300px] md:h-[350px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <DebateMessage content={bull} side="Bull" icon={TrendingUp} color="border-emerald-500/30 bg-emerald-500/5" />
+                <DebateMessage content={bear} side="Bear" icon={TrendingDown} color="border-rose-500/30 bg-rose-500/5" />
               </div>
             </ScrollArea>
           </CardContent>
@@ -67,16 +67,16 @@ export function DebateView({ bull, bear, riskAggressive, riskConservative, riskN
       {hasRiskDebate && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Shield className="h-4 w-4" /> Risk Assessment Debate
+            <CardTitle className="text-sm flex items-center gap-2 font-semibold">
+              <Shield className="h-4 w-4 text-primary" /> Risk Assessment Debate
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[250px]">
-              <div className="grid grid-cols-3 gap-3">
-                <DebateMessage content={riskAggressive || ""} side="Aggressive" icon={TrendingUp} color="border-orange-500/20 bg-orange-500/5" />
-                <DebateMessage content={riskConservative || ""} side="Conservative" icon={Shield} color="border-blue-500/20 bg-blue-500/5" />
-                <DebateMessage content={riskNeutral || ""} side="Neutral" icon={Scale} color="border-purple-500/20 bg-purple-500/5" />
+            <ScrollArea className="h-[250px] md:h-[300px]">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <DebateMessage content={riskAggressive || ""} side="Aggressive" icon={TrendingUp} color="border-amber-500/30 bg-amber-500/5" />
+                <DebateMessage content={riskConservative || ""} side="Conservative" icon={Shield} color="border-blue-500/30 bg-blue-500/5" />
+                <DebateMessage content={riskNeutral || ""} side="Neutral" icon={Scale} color="border-purple-500/30 bg-purple-500/5" />
               </div>
             </ScrollArea>
           </CardContent>

@@ -37,11 +37,11 @@ function getDayContext() {
 
 export default function DashboardPage() {
   return (
-    <div className="p-6 space-y-5 max-w-7xl">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-bold">{getGreeting()}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{getDayContext()}</p>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{getGreeting()}</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{getDayContext()}</p>
       </div>
 
       {/* Market Status Bar */}
@@ -74,7 +74,7 @@ export default function DashboardPage() {
       <WorkflowGuide />
 
       {/* Watchlist + Recent Analyses side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <Watchlist />
         <RecentAnalyses />
       </div>

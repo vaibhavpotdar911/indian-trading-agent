@@ -86,9 +86,9 @@ function AnalysisPageInner() {
       {/* Input Section */}
       <Card className="overflow-visible">
         <CardContent className="p-4 overflow-visible">
-          <div className="flex gap-3 items-end">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
             <div className="flex-1">
-              <label className="text-xs text-muted-foreground mb-1 block">Ticker Symbol</label>
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">Ticker Symbol</label>
               <TickerSearch
                 value={tickerInput}
                 onChange={setTickerInput}
@@ -96,8 +96,8 @@ function AnalysisPageInner() {
                 disabled={analysis.status === "running"}
               />
             </div>
-            <div className="w-44">
-              <label className="text-xs text-muted-foreground mb-1 block">Analysis Date</label>
+            <div className="w-full sm:w-44">
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">Analysis Date</label>
               <Input
                 type="date"
                 value={tradeDateInput}
@@ -108,7 +108,7 @@ function AnalysisPageInner() {
             <Button
               onClick={handleRun}
               disabled={analysis.status === "running" || !tickerInput.trim()}
-              className="h-10"
+              className="h-10 w-full sm:w-auto font-semibold"
             >
               {analysis.status === "running" ? (
                 <>
