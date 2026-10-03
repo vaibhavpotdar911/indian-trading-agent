@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { MainContent } from "@/components/theme/MainContent";
 import { getAuthStatus } from "@/lib/api";
 
@@ -44,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <Sidebar />
       <MainContent>{children}</MainContent>
+      <BottomNav />
     </>
   );
 }
