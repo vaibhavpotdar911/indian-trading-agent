@@ -50,6 +50,16 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
             callbacks=[stats],
         )
 
+        # Initial state save
+        current_result = {
+            "ticker": ticker,
+            "trade_date": trade_date,
+            "signal": "ANALYZING...",
+            "duration_seconds": 0,
+        }
+        save_analysis(task_id, current_result)
+        _tasks[task_id]["result"] = current_result
+
         # Stream the graph execution
         propagator = Propagator(max_recur_limit=config.get("max_recur_limit", 100))
         init_state = propagator.create_initial_state(ticker, trade_date)
@@ -81,12 +91,14 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
             }))
 
             # Detect report updates
+            reports_updated = False
             for field in ["market_report", "sentiment_report", "news_report",
                           "fundamentals_report", "investment_plan",
                           "trader_investment_plan", "final_trade_decision"]:
                 val = chunk.get(field)
                 if val and val != prev_reports.get(field):
                     prev_reports[field] = val
+                    reports_updated = True
                     print(f"[Analysis {task_id}] Report completed: {field}", flush=True)
                     loop.run_until_complete(manager.send_event(task_id, {
                         "type": "report",
@@ -101,17 +113,20 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
                 bear = invest_state.get("bear_history", "")
                 if bull and bull != prev_reports.get("bull_history"):
                     prev_reports["bull_history"] = bull
+                    reports_updated = True
                     loop.run_until_complete(manager.send_event(task_id, {
                         "type": "debate", "side": "bull", "content": bull,
                     }))
                 if bear and bear != prev_reports.get("bear_history"):
                     prev_reports["bear_history"] = bear
+                    reports_updated = True
                     loop.run_until_complete(manager.send_event(task_id, {
                         "type": "debate", "side": "bear", "content": bear,
                     }))
                 judge = invest_state.get("judge_decision", "")
                 if judge and judge != prev_reports.get("judge_decision"):
                     prev_reports["judge_decision"] = judge
+                    reports_updated = True
                     loop.run_until_complete(manager.send_event(task_id, {
                         "type": "report", "section": "investment_plan", "content": judge,
                     }))
@@ -124,9 +139,30 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
                     val = risk_state.get(key, "")
                     if val and val != prev_reports.get(f"risk_{key}"):
                         prev_reports[f"risk_{key}"] = val
+                        reports_updated = True
                         loop.run_until_complete(manager.send_event(task_id, {
                             "type": "risk_debate", "side": side, "content": val,
                         }))
+
+            # Incremental save to DB on every report milestone
+            if reports_updated:
+                current_result.update({
+                    "market_report": chunk.get("market_report"),
+                    "sentiment_report": chunk.get("sentiment_report"),
+                    "news_report": chunk.get("news_report"),
+                    "fundamentals_report": chunk.get("fundamentals_report"),
+                    "investment_plan": chunk.get("investment_plan"),
+                    "trader_investment_plan": chunk.get("trader_investment_plan"),
+                    "final_trade_decision": chunk.get("final_trade_decision"),
+                    "bull_history": (chunk.get("investment_debate_state") or {}).get("bull_history"),
+                    "bear_history": (chunk.get("investment_debate_state") or {}).get("bear_history"),
+                    "risk_aggressive_history": (chunk.get("risk_debate_state") or {}).get("aggressive_history"),
+                    "risk_conservative_history": (chunk.get("risk_debate_state") or {}).get("conservative_history"),
+                    "risk_neutral_history": (chunk.get("risk_debate_state") or {}).get("neutral_history"),
+                    "duration_seconds": round(time.time() - start_time, 1),
+                })
+                save_analysis(task_id, current_result)
+                _tasks[task_id]["result"] = current_result
 
         # Get final state
         final_state = chunk  # Last chunk is the final state
@@ -148,7 +184,7 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
             "stats": stats_summary,
         }))
 
-        # Save to DB
+        # Final save to DB
         invest_state = final_state.get("investment_debate_state", {})
         risk_state = final_state.get("risk_debate_state", {})
 
@@ -205,6 +241,7 @@ def run_analysis(req: AnalysisRequest):
         "ticker": ticker,
         "trade_date": req.trade_date,
         "analysts": req.analysts,
+        "start_time": time.time(),
     }
 
     thread = threading.Thread(
@@ -391,5 +428,22 @@ def get_memory_stats():
 
 @router.get("/history/list")
 def list_analysis_history(limit: int = 50, offset: int = 0):
-    """List past analyses."""
-    return get_analysis_history(limit, offset)
+    """List past and currently running analyses."""
+    db_history = get_analysis_history(limit, offset)
+    db_task_ids = {h["task_id"] for h in db_history}
+
+    running_tasks = []
+    for tid, tinfo in list(_tasks.items()):
+        if tinfo.get("status") == "running" and tid not in db_task_ids:
+            res = tinfo.get("result", {})
+            running_tasks.append({
+                "task_id": tid,
+                "ticker": tinfo.get("ticker", "N/A"),
+                "trade_date": tinfo.get("trade_date", ""),
+                "signal": res.get("signal") or "ANALYZING...",
+                "duration_seconds": round(time.time() - tinfo.get("start_time", time.time()), 1),
+                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+    return running_tasks + db_history
+

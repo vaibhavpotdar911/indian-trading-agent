@@ -20,6 +20,7 @@ const signalColors: Record<string, string> = {
   SELL: "bg-red-500/20 text-red-400 border-red-500/30",
   SHORT: "bg-red-500/20 text-red-400 border-red-500/30",
   UNDERWEIGHT: "bg-red-500/15 text-red-300 border-red-500/20",
+  "ANALYZING...": "bg-blue-500/20 text-blue-400 border-blue-500/30 animate-pulse font-mono",
 };
 
 export function RecentAnalyses() {
@@ -28,8 +29,14 @@ export function RecentAnalyses() {
   const [previewResult, setPreviewResult] = useState<AnalysisResult | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
-  useEffect(() => {
+  const fetchHistory = () => {
     getAnalysisHistory(5).then((data: any) => setAnalyses(data)).catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchHistory();
+    const interval = setInterval(fetchHistory, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const openPreview = (taskId: string) => {

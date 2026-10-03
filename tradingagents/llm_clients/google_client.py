@@ -49,13 +49,14 @@ def get_google_live_models(api_key: Optional[str] = None) -> dict:
 
 
 class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
-    """ChatGoogleGenerativeAI with normalized content output, 429 rate-limit backoff, and automatic 404 model fallback.
+    """ChatGoogleGenerativeAI with normalized content output, 429 rate-limit backoff, and automatic model fallback.
 
     Gemini 3 models return content as list of typed blocks.
     This normalizes to string and gracefully recovers if rate limited or if an obsolete model returns 404 NOT_FOUND.
     """
 
     def invoke(self, input, config=None, **kwargs):
+        fallbacks = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.0-flash"]
         try:
             return normalize_content(super().invoke(input, config, **kwargs))
         except Exception as e:
@@ -67,21 +68,34 @@ class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
                     cooldown = 3600 if is_daily else 30
                     quota_tracker.record_429("google", cooldown_seconds=cooldown)
                 except Exception:
-                    pass
+                    is_daily = "GenerateRequestsPerDay" in err_msg
 
                 import time
-                logger.warning(
-                    f"[GoogleClient] Rate limit 429 encountered: {err_msg[:120]}. Sleeping 6s before retry..."
-                )
-                time.sleep(6)
-                try:
-                    return normalize_content(super().invoke(input, config, **kwargs))
-                except Exception:
-                    time.sleep(12)
+
+                # If daily model quota reached (e.g. 20 RPD cap), attempt model fallback automatically
+                if is_daily:
+                    for fb_model in fallbacks:
+                        if fb_model != self.model:
+                            logger.warning(
+                                f"[GoogleClient] Daily free quota reached for '{self.model}'. Auto-switching to '{fb_model}'..."
+                            )
+                            self.model = fb_model
+                            try:
+                                return normalize_content(super().invoke(input, config, **kwargs))
+                            except Exception:
+                                continue
+
+                # Progressive retry backoff for minute rate limits
+                for wait_sec in [5, 10, 15, 20]:
+                    logger.warning(
+                        f"[GoogleClient] Rate limit 429 encountered: {err_msg[:120]}. Sleeping {wait_sec}s before retry..."
+                    )
+                    time.sleep(wait_sec)
                     try:
                         return normalize_content(super().invoke(input, config, **kwargs))
-                    except Exception as inner_e:
-                        raise inner_e
+                    except Exception as retry_e:
+                        err_msg = str(retry_e)
+
             if "404" in err_msg or "NOT_FOUND" in err_msg or "no longer available" in err_msg:
                 logger.warning(
                     f"[GoogleClient] Model '{self.model}' returned 404/Not Found. Automatically falling back to '{FALLBACK_GOOGLE_FLASH_MODEL}'."
