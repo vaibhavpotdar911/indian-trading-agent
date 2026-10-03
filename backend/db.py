@@ -345,6 +345,17 @@ def update_analysis_pnl(task_id: str, entry_price: float, exit_price: float, pnl
 def get_analysis(task_id: str) -> dict | None:
     _migrate_analysis_history_columns()
     with get_db() as conn:
+        # Auto-update if this specific task was stuck in ANALYZING... > 15 mins ago
+        conn.execute(
+            """UPDATE analysis_history
+               SET status = 'error',
+                   signal = 'INTERRUPTED',
+                   error_message = COALESCE(error_message, 'Analysis timed out (exceeded 15 min limit) or backend was restarted.')
+               WHERE task_id = ?
+                 AND (signal = 'ANALYZING...' OR status = 'running')
+                 AND created_at < datetime('now', '-15 minutes')""",
+            (task_id,),
+        )
         row = conn.execute("SELECT * FROM analysis_history WHERE task_id = ?", (task_id,)).fetchone()
         if row:
             d = dict(row)
@@ -357,6 +368,16 @@ def get_analysis(task_id: str) -> dict | None:
 def get_analysis_history(limit: int = 50, offset: int = 0) -> list[dict]:
     _migrate_analysis_history_columns()
     with get_db() as conn:
+        # Auto-terminate any legacy/stuck analyses that were left in 'ANALYZING...' state older than 15 minutes
+        conn.execute(
+            """UPDATE analysis_history
+               SET status = 'error',
+                   signal = 'INTERRUPTED',
+                   error_message = COALESCE(error_message, 'Analysis timed out (exceeded 15 min limit) or backend was restarted.')
+               WHERE (signal = 'ANALYZING...' OR status = 'running')
+                 AND created_at < datetime('now', '-15 minutes')"""
+        )
+
         rows = conn.execute(
             """SELECT task_id, ticker, trade_date, signal, status, error_message, duration_seconds,
                       entry_price, exit_price, pnl_pct, pnl_status, created_at

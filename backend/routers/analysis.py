@@ -438,22 +438,39 @@ def get_memory_stats():
 
 @router.get("/history/list")
 def list_analysis_history(limit: int = 50, offset: int = 0):
-    """List past and currently running analyses."""
+    """List past and currently running analyses, automatically timing out stale runs."""
     db_history = get_analysis_history(limit, offset)
     db_task_ids = {h["task_id"] for h in db_history}
 
     running_tasks = []
+    now = time.time()
     for tid, tinfo in list(_tasks.items()):
-        if tinfo.get("status") == "running" and tid not in db_task_ids:
-            res = tinfo.get("result", {})
-            running_tasks.append({
-                "task_id": tid,
-                "ticker": tinfo.get("ticker", "N/A"),
-                "trade_date": tinfo.get("trade_date", ""),
-                "signal": res.get("signal") or "ANALYZING...",
-                "duration_seconds": round(time.time() - tinfo.get("start_time", time.time()), 1),
-                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            })
+        start_t = tinfo.get("start_time", now)
+        elapsed = now - start_t
+
+        if tinfo.get("status") == "running":
+            # If a running task in memory exceeds 15 minutes (900s), terminate it
+            if elapsed > 900:
+                _tasks[tid]["status"] = "error"
+                _tasks[tid]["error"] = "Analysis execution timed out after 15 minutes."
+                current_res = tinfo.get("result", {})
+                current_res.update({
+                    "status": "error",
+                    "signal": "INTERRUPTED",
+                    "error_message": "Analysis execution timed out after 15 minutes.",
+                    "duration_seconds": round(elapsed, 1),
+                })
+                save_analysis(tid, current_res)
+            elif tid not in db_task_ids:
+                res = tinfo.get("result", {})
+                running_tasks.append({
+                    "task_id": tid,
+                    "ticker": tinfo.get("ticker", "N/A"),
+                    "trade_date": tinfo.get("trade_date", ""),
+                    "signal": res.get("signal") or "ANALYZING...",
+                    "duration_seconds": round(elapsed, 1),
+                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                })
 
     return running_tasks + db_history
 
