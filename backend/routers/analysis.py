@@ -218,6 +218,16 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
         print(f"[Analysis {task_id}] Execution Error: {err_msg}", flush=True)
         _tasks[task_id]["status"] = "error"
         _tasks[task_id]["error"] = err_msg
+
+        current_result.update({
+            "status": "error",
+            "signal": "INTERRUPTED",
+            "error_message": err_msg,
+            "duration_seconds": round(time.time() - start_time, 1),
+        })
+        save_analysis(task_id, current_result)
+        _tasks[task_id]["result"] = current_result
+
         loop.run_until_complete(manager.send_event(task_id, {
             "type": "error", "message": err_msg,
         }))

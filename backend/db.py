@@ -44,6 +44,8 @@ def ensure_db():
                 ticker TEXT NOT NULL,
                 trade_date TEXT NOT NULL,
                 signal TEXT,
+                status TEXT DEFAULT 'completed',
+                error_message TEXT,
                 market_report TEXT,
                 sentiment_report TEXT,
                 news_report TEXT,
@@ -280,21 +282,40 @@ def remove_from_watchlist(ticker: str):
 
 # --- Analysis History ---
 
+def _migrate_analysis_history_columns():
+    """Add status and error_message columns to analysis_history if missing."""
+    with get_db() as conn:
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(analysis_history)").fetchall()}
+        if "status" not in existing:
+            try:
+                conn.execute("ALTER TABLE analysis_history ADD COLUMN status TEXT DEFAULT 'completed'")
+            except Exception:
+                pass
+        if "error_message" not in existing:
+            try:
+                conn.execute("ALTER TABLE analysis_history ADD COLUMN error_message TEXT")
+            except Exception:
+                pass
+
+
 def save_analysis(task_id: str, data: dict):
+    _migrate_analysis_history_columns()
     with get_db() as conn:
         conn.execute(
             """INSERT OR REPLACE INTO analysis_history
-            (task_id, ticker, trade_date, signal, market_report, sentiment_report,
-             news_report, fundamentals_report, investment_plan, trader_investment_plan,
-             final_trade_decision, bull_history, bear_history,
-             risk_aggressive_history, risk_conservative_history, risk_neutral_history,
-             stats, duration_seconds)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (task_id, ticker, trade_date, signal, status, error_message,
+             market_report, sentiment_report, news_report, fundamentals_report,
+             investment_plan, trader_investment_plan, final_trade_decision,
+             bull_history, bear_history, risk_aggressive_history,
+             risk_conservative_history, risk_neutral_history, stats, duration_seconds)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 task_id,
                 data.get("ticker"),
                 data.get("trade_date"),
                 data.get("signal"),
+                data.get("status", "completed"),
+                data.get("error_message"),
                 data.get("market_report"),
                 data.get("sentiment_report"),
                 data.get("news_report"),
@@ -322,6 +343,7 @@ def update_analysis_pnl(task_id: str, entry_price: float, exit_price: float, pnl
 
 
 def get_analysis(task_id: str) -> dict | None:
+    _migrate_analysis_history_columns()
     with get_db() as conn:
         row = conn.execute("SELECT * FROM analysis_history WHERE task_id = ?", (task_id,)).fetchone()
         if row:
@@ -333,9 +355,10 @@ def get_analysis(task_id: str) -> dict | None:
 
 
 def get_analysis_history(limit: int = 50, offset: int = 0) -> list[dict]:
+    _migrate_analysis_history_columns()
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT task_id, ticker, trade_date, signal, duration_seconds,
+            """SELECT task_id, ticker, trade_date, signal, status, error_message, duration_seconds,
                       entry_price, exit_price, pnl_pct, pnl_status, created_at
                FROM analysis_history ORDER BY created_at DESC LIMIT ? OFFSET ?""",
             (limit, offset),

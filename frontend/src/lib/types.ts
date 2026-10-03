@@ -55,6 +55,8 @@ export interface AnalysisResult {
   ticker: string;
   trade_date: string;
   signal: string;
+  status?: string;
+  error_message?: string;
   market_report?: string;
   sentiment_report?: string;
   news_report?: string;
@@ -86,6 +88,8 @@ export interface AnalysisHistoryItem {
   ticker: string;
   trade_date: string;
   signal: string;
+  status?: string;
+  error_message?: string;
   duration_seconds: number;
   entry_price?: number;
   exit_price?: number;

@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DecisionCard } from "@/components/analysis/DecisionCard";
-import { ReportPanel } from "@/components/analysis/ReportPanel";
-import { Eye, ExternalLink, History, Loader2 } from "lucide-react";
+import { DebateView } from "@/components/analysis/DebateView";
+import { StatsCard } from "@/components/analysis/StatsCard";
+import { Eye, ExternalLink, History, Loader2, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
 
 const signalColors: Record<string, string> = {
@@ -21,6 +22,7 @@ const signalColors: Record<string, string> = {
   SHORT: "bg-red-500/20 text-red-400 border-red-500/30",
   UNDERWEIGHT: "bg-red-500/15 text-red-300 border-red-500/20",
   "ANALYZING...": "bg-blue-500/20 text-blue-400 border-blue-500/30 animate-pulse font-mono",
+  INTERRUPTED: "bg-red-500/20 text-red-400 border-red-500/30 font-medium",
 };
 
 export function RecentAnalyses() {
@@ -60,6 +62,8 @@ export function RecentAnalyses() {
     if (previewResult.final_trade_decision) reports.final_trade_decision = previewResult.final_trade_decision;
   }
 
+  const isInterrupted = previewResult?.status === "error" || previewResult?.signal === "INTERRUPTED" || !!previewResult?.error_message;
+
   return (
     <>
       <Card>
@@ -75,40 +79,43 @@ export function RecentAnalyses() {
               No stored reports yet. <Link href="/analysis" className="text-primary hover:underline">Run your first analysis</Link>
             </p>
           ) : (
-            analyses.map((a) => (
-              <div
-                key={a.task_id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{a.ticker}</span>
-                    <Badge variant="outline" className={signalColors[a.signal] || ""}>
-                      {a.signal}
-                    </Badge>
+            analyses.map((a) => {
+              const itemInterrupted = a.status === "error" || a.signal === "INTERRUPTED" || !!a.error_message;
+              return (
+                <div
+                  key={a.task_id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{a.ticker}</span>
+                      <Badge variant="outline" className={itemInterrupted ? signalColors.INTERRUPTED : (signalColors[a.signal] || "")}>
+                        {itemInterrupted ? "INTERRUPTED" : a.signal}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Date: {a.trade_date} {a.duration_seconds ? `| ${Math.round(a.duration_seconds)}s` : ""}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Date: {a.trade_date} {a.duration_seconds ? `| ${Math.round(a.duration_seconds)}s` : ""}
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => openPreview(a.task_id)}
-                  >
-                    <Eye className="h-3.5 w-3.5 mr-1" /> Preview
-                  </Button>
-                  <Link href={`/analysis/${a.task_id}`}>
-                    <Button size="sm" variant="outline" className="h-8 px-2 text-xs">
-                      <ExternalLink className="h-3.5 w-3.5 mr-1" /> View Full
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => openPreview(a.task_id)}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1" /> Preview
                     </Button>
-                  </Link>
+                    <Link href={`/analysis/${a.task_id}`}>
+                      <Button size="sm" variant="outline" className="h-8 px-2 text-xs">
+                        <ExternalLink className="h-3.5 w-3.5 mr-1" /> View Full
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </CardContent>
       </Card>
@@ -118,7 +125,22 @@ export function RecentAnalyses() {
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between pr-6">
-              <span>{previewResult?.ticker || "Stored Analysis"} Report Preview</span>
+              <div className="flex items-center gap-2">
+                <span>{previewResult?.ticker || "Stored Analysis"} Report Preview</span>
+                {isInterrupted ? (
+                  <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30">
+                    <AlertTriangle className="h-3 w-3 mr-1" /> Interrupted
+                  </Badge>
+                ) : previewResult?.signal === "ANALYZING..." ? (
+                  <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/30 animate-pulse">
+                    <Clock className="h-3 w-3 mr-1" /> In Progress
+                  </Badge>
+                ) : previewResult ? (
+                  <Badge variant="outline" className="bg-green-500/15 text-green-500 border-green-500/30">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Completed
+                  </Badge>
+                ) : null}
+              </div>
               {selectedTaskId && (
                 <Link href={`/analysis/${selectedTaskId}`}>
                   <Button size="sm">
@@ -136,12 +158,45 @@ export function RecentAnalyses() {
             </div>
           ) : previewResult ? (
             <div className="space-y-4 pt-2">
-              <DecisionCard
-                signal={previewResult.signal}
-                ticker={previewResult.ticker}
-                duration={previewResult.duration_seconds}
-              />
+              {/* Interruption alert banner */}
+              {isInterrupted && (
+                <Card className="border-red-500/40 bg-red-500/10 dark:bg-red-950/30">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-red-500 font-semibold text-sm">
+                      <AlertTriangle className="h-4 w-4" />
+                      Analysis Interrupted (LLM Quota or API Error)
+                    </div>
+                    <p className="text-xs text-red-400 font-mono break-words">
+                      {previewResult.error_message || "Google Gemini free tier limit hit. Partial reports generated before interruption are shown below."}
+                    </p>
+                    <div className="text-xs text-muted-foreground pt-1 border-t border-red-500/20">
+                      💡 <strong>Workaround:</strong> Go to <Link href="/settings" className="text-primary underline">Settings</Link> to switch models (e.g., <code className="bg-muted px-1 py-0.5 rounded">gemini-2.5-flash</code>) or attach billing to your Google AI Studio key.
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {previewResult.signal && previewResult.signal !== "INTERRUPTED" && (
+                <DecisionCard
+                  signal={previewResult.signal}
+                  ticker={previewResult.ticker}
+                  duration={previewResult.duration_seconds}
+                />
+              )}
+
+              {previewResult.stats && (
+                <StatsCard stats={previewResult.stats} duration={previewResult.duration_seconds} />
+              )}
+
               <ReportPanel reports={reports} />
+
+              <DebateView
+                bull={previewResult.bull_history || ""}
+                bear={previewResult.bear_history || ""}
+                riskAggressive={previewResult.risk_aggressive_history}
+                riskConservative={previewResult.risk_conservative_history}
+                riskNeutral={previewResult.risk_neutral_history}
+              />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-6 text-center">
