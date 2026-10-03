@@ -188,7 +188,13 @@ function AnalysisPageInner() {
         <div className="grid grid-cols-4 gap-6">
           {/* Left: Agent Progress */}
           <div className="col-span-1">
-            <AgentProgress reports={analysis.reports} signal={analysis.signal} status={analysis.status} />
+            <AgentProgress
+              reports={analysis.reports}
+              debates={analysis.debates}
+              riskDebates={analysis.riskDebates}
+              signal={analysis.signal}
+              status={analysis.status}
+            />
           </div>
 
           {/* Right: Reports */}

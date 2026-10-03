@@ -177,7 +177,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
             const currentWs = get().ws;
             if (currentWs) try { currentWs.close(); } catch {}
             set({ status: "error", error: res.error || "Analysis failed", ws: null, pollInterval: null });
-          } else if (res.status === "completed" || res.signal || res.market_report) {
+          } else if (res.status === "completed") {
             if (get().pollInterval) clearInterval(get().pollInterval);
             const currentWs = get().ws;
             if (currentWs) try { currentWs.close(); } catch {}
@@ -210,6 +210,19 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
               pollInterval: null,
               heartbeat: "Complete",
             });
+          } else if (res.status === "running") {
+            // While running, sync partial reports if present without stopping WS
+            const state = get();
+            const newReports = { ...state.reports };
+            if (res.market_report && !newReports.market_report) newReports.market_report = res.market_report;
+            if (res.sentiment_report && !newReports.sentiment_report) newReports.sentiment_report = res.sentiment_report;
+            if (res.news_report && !newReports.news_report) newReports.news_report = res.news_report;
+            if (res.fundamentals_report && !newReports.fundamentals_report) newReports.fundamentals_report = res.fundamentals_report;
+            if (res.investment_plan && !newReports.investment_plan) newReports.investment_plan = res.investment_plan;
+            if (res.trader_investment_plan && !newReports.trader_investment_plan) newReports.trader_investment_plan = res.trader_investment_plan;
+            if (res.final_trade_decision && !newReports.final_trade_decision) newReports.final_trade_decision = res.final_trade_decision;
+
+            set({ reports: newReports });
           }
         } catch {
           // Ignore network errors in polling fallback

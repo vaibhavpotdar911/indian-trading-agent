@@ -23,11 +23,13 @@ const defaultAgents: Agent[] = [
 
 interface Props {
   reports: Record<string, string>;
+  debates?: { bull?: string; bear?: string };
+  riskDebates?: { aggressive?: string; conservative?: string; neutral?: string };
   signal: string | null;
   status: string;
 }
 
-export function AgentProgress({ reports, signal, status }: Props) {
+export function AgentProgress({ reports, debates, riskDebates, signal, status }: Props) {
   const reportMap: Record<string, string> = {
     "Market Analyst": "market_report",
     "Social Analyst": "sentiment_report",
@@ -36,9 +38,6 @@ export function AgentProgress({ reports, signal, status }: Props) {
     "Research Manager": "investment_plan",
     "Trader": "trader_investment_plan",
     "Portfolio Manager": "final_trade_decision",
-    "Bull Researcher": "bull_history",
-    "Bear Researcher": "bear_history",
-    "Risk Debate": "risk_aggressive_history",
   };
 
   // First pass: determine completed status
@@ -46,9 +45,18 @@ export function AgentProgress({ reports, signal, status }: Props) {
     if (status === "completed") return "completed" as const;
     if (status !== "running") return "pending" as const;
 
+    if (agent.name === "Bull Researcher") {
+      return (debates?.bull || reports["bull_history"]) ? ("completed" as const) : ("pending" as const);
+    }
+    if (agent.name === "Bear Researcher") {
+      return (debates?.bear || reports["bear_history"]) ? ("completed" as const) : ("pending" as const);
+    }
+    if (agent.name === "Risk Debate") {
+      return (riskDebates?.aggressive || riskDebates?.conservative || riskDebates?.neutral || reports["risk_aggressive_history"]) ? ("completed" as const) : ("pending" as const);
+    }
+
     const reportKey = reportMap[agent.name];
     if (reportKey && reports[reportKey]) return "completed" as const;
-    if (agent.name === "Risk Debate" && reports["risk_conservative_history"]) return "completed" as const;
     return "pending" as const;
   });
 
