@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DecisionCard } from "@/components/analysis/DecisionCard";
 import { DebateView } from "@/components/analysis/DebateView";
 import { StatsCard } from "@/components/analysis/StatsCard";
+import { ReportPanel } from "@/components/analysis/ReportPanel";
 import { Eye, ExternalLink, History, Loader2, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
 
