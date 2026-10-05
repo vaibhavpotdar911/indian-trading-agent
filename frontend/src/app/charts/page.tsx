@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { HelpSection } from "@/components/HelpSection";
 import { chartsHelp } from "@/lib/help-content";
 import { TradingViewAdvancedChart } from "@/components/charts/TradingViewAdvancedChart";
+import { KotakLiveTicker } from "@/components/charts/KotakLiveTicker";
 import { LineChart, BarChart2 } from "lucide-react";
 
 const periods = ["1mo", "3mo", "6mo", "1y", "2y"];
@@ -330,6 +331,8 @@ export default function ChartsPage() {
           </div>
         )}
       </div>
+
+      <Card><CardContent className="p-3 flex items-center justify-between"><span className="text-xs text-muted-foreground">Kotak Neo v3 live feed</span><KotakLiveTicker ticker={submittedTicker} /></CardContent></Card>
 
       {/* Main Chart Container */}
       {engine === "tradingview" ? (

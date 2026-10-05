@@ -741,3 +741,17 @@ This software is provided **"as-is"** without warranty of any kind. The AI model
 - Consult a SEBI-registered investment advisor for personalized advice
 
 Trading in financial markets carries substantial risk. Past performance — whether historical backtests or agent learning — does not guarantee future results.
+# Data sources
+
+The application uses a layered data-source strategy:
+
+- Kotak Neo SDK 3.x for authenticated live quotes and historical candles.
+- NSE/BSE exchange archives for end-of-day cross-checking and corporate actions.
+- Optional Stoxim fundamentals (`STOXIM_API_KEY`), using its free plan when configured.
+- Yahoo Finance as a fallback for research and backtesting.
+
+Stoxim setup: create a free personal-use API key at https://www.stoxim.com/ and
+save it under **Settings → Market & Fundamental Data**. `STOXIM_API_KEY` remains
+available as an environment fallback. The fundamental backtest reports which
+source it used. Do not treat free-provider data as execution-grade without
+validating it against exchange filings.

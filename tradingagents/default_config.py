@@ -39,6 +39,7 @@ DEFAULT_CONFIG = {
     "market_close": "15:30",
     "currency": "INR",
     # Trading style
+    "trading_mode": "equity_swing",  # equity_long_term | equity_swing | futures | options
     "trading_style": "short_term",  # short_term | swing | positional
     "default_lookback_days": 15,
     # Indian market news queries (used by yfinance news when market=india)

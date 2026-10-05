@@ -31,6 +31,7 @@ export default function AnalysisPage() {
 function AnalysisPageInner() {
   const searchParams = useSearchParams();
   const defaultTicker = searchParams.get("ticker") || "";
+  const tradingMode = searchParams.get("mode") === "equity_long_term" ? "equity_long_term" : "equity_swing";
 
   // Global store — survives page navigation
   const analysis = useAnalysisStore();
@@ -53,6 +54,7 @@ function AnalysisPageInner() {
     if (!tickerInput.trim()) return;
     analysis.start(tickerInput.trim(), tradeDateInput, {
       analysts: selectedAnalysts,
+      trading_mode: tradingMode,
       max_debate_rounds: depth,
       max_risk_discuss_rounds: depth,
       output_language: language,

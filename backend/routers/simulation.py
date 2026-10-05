@@ -22,6 +22,12 @@ router = APIRouter(prefix="/api/simulation", tags=["simulation"])
 
 class OpenTradeRequest(BaseModel):
     ticker: str
+    trading_mode: str = "equity_swing"
+    stop_loss: float | None = None
+    target: float | None = None
+    quantity: float | None = None
+    capital: float | None = None
+    enforce_risk: bool = False
     source: str = "manual"
     strategy: str | None = None
     signal: str | None = None
@@ -37,6 +43,12 @@ def open_trade(req: OpenTradeRequest):
     """Open a virtual paper trade at current market price."""
     return open_paper_trade(
         ticker=req.ticker,
+        trading_mode=req.trading_mode,
+        stop_loss=req.stop_loss,
+        target=req.target,
+        quantity=req.quantity,
+        capital=req.capital,
+        enforce_risk=req.enforce_risk,
         source=req.source,
         strategy=req.strategy,
         signal=req.signal,
@@ -49,9 +61,14 @@ def open_trade(req: OpenTradeRequest):
 
 
 @router.get("/paper-trades")
-def list_trades(status: str | None = Query(None, description="active | expired | manually_closed")):
+def list_trades(
+    status: str | None = Query(None, description="active | expired | manually_closed"),
+    trading_mode: str | None = Query(None, description="equity_long_term | equity_swing"),
+):
     """List paper trades (optionally filter by status)."""
     trades = list_paper_trades(status=status)
+    if trading_mode:
+        trades = [trade for trade in trades if trade.get("trading_mode") == trading_mode]
     return {"trades": trades, "count": len(trades)}
 
 
@@ -62,9 +79,9 @@ def refresh_prices():
 
 
 @router.get("/paper-trades/stats")
-def get_stats():
+def get_stats(trading_mode: str | None = Query(None)):
     """Get aggregate stats across all paper trades."""
-    return paper_trading_stats()
+    return paper_trading_stats(trading_mode=trading_mode)
 
 
 @router.delete("/paper-trades/{trade_id}")
@@ -87,6 +104,7 @@ def run_backtest(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
     interval_days: int = Query(5),
+    trading_mode: str = Query("equity_swing"),
 ):
     """Run recommendation engine on historical dates and measure actual outcomes. FREE."""
     return run_recommender_backtest(
@@ -94,6 +112,7 @@ def run_backtest(
         start_date=start_date,
         end_date=end_date,
         interval_days=interval_days,
+        trading_mode=trading_mode,
     )
 
 

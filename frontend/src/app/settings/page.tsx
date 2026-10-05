@@ -9,6 +9,8 @@ import { LLMSettings } from "@/components/settings/LLMSettings";
 import { QuotaWidget } from "@/components/QuotaWidget";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { statusColors } from "@/lib/status-colors";
+import { RiskSettings } from "@/components/settings/RiskSettings";
+import { DataProviderSettings } from "@/components/settings/DataProviderSettings";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<Record<string, any> | null>(null);
@@ -79,6 +81,9 @@ export default function SettingsPage() {
 
       {/* Unified Models & Keys — provider chips + inline keys + set-default */}
       <LLMSettings />
+
+      <RiskSettings />
+      <DataProviderSettings />
 
       <div>
         <h2 className="text-lg font-semibold">System Configuration</h2>

@@ -150,6 +150,10 @@ export function TodayPicks({ universe = "nifty100" }: { universe?: string }) {
                       try {
                         await openPaperTrade({
                           ticker: pick.ticker,
+                          trading_mode: pick.trading_mode || "equity_swing",
+                          stop_loss: pick.trade_plan?.stop_loss,
+                          target: pick.trade_plan?.target,
+                          enforce_risk: true,
                           source: "recommendation",
                           strategy: "Recommendation Engine (combined signals)",
                           signal: pick.direction,
@@ -173,7 +177,7 @@ export function TodayPicks({ universe = "nifty100" }: { universe?: string }) {
                   >
                     <FlaskConical className="h-3 w-3 mr-1" /> Track
                   </Button>
-                  <Link href={`/analysis?ticker=${pick.ticker}`}>
+                   <Link href={`/analysis?ticker=${pick.ticker}&mode=${pick.trading_mode || "equity_swing"}`}>
                     <Button size="sm" variant="outline">
                       Analyze <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>

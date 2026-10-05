@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/backtest", tags=["backtest"])
 
 class BacktestRequest(BaseModel):
     ticker: str
+    trading_mode: str = "equity_swing"
     start_date: str
     end_date: str
     interval_days: int = 5
@@ -49,6 +50,7 @@ def _run_backtest_thread(backtest_id: str, req: BacktestRequest):
     # Save initial run
     save_backtest_run(backtest_id, {
         "ticker": ticker,
+        "trading_mode": req.trading_mode,
         "initial_capital": req.initial_capital,
         "position_size_pct": req.position_size_pct,
         "enable_learning": req.enable_learning,
@@ -128,6 +130,7 @@ def start_backtest(req: BacktestRequest):
         "backtest_id": backtest_id,
         "status": "started",
         "ticker": normalize_ticker(req.ticker),
+        "trading_mode": req.trading_mode,
         "total_dates": len(dates),
         "dates": dates,
     }

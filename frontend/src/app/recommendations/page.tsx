@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getRecommendations, openPaperTrade } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +96,21 @@ function RecommendationCard({ rec }: { rec: any }) {
                 {rec.bearish_signal_count > 0 && <span className="text-red-600">{rec.bearish_signal_count} bearish signals</span>}
                 {rec.rsi !== null && <span> / RSI: {rec.rsi}</span>}
               </p>
+              {rec.trade_plan && (
+                <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                  <Badge variant="outline">Hold: {rec.trade_plan.holding_period}</Badge>
+                  {rec.trade_plan.stop_loss && <Badge variant="outline" className="text-red-600">SL: Rs.{rec.trade_plan.stop_loss}</Badge>}
+                  {rec.trade_plan.target && <Badge variant="outline" className="text-green-600">Target: Rs.{rec.trade_plan.target}</Badge>}
+                  {rec.trade_plan.risk_reward && <Badge variant="outline">R:R {rec.trade_plan.risk_reward}:1</Badge>}
+                </div>
+              )}
+              {rec.strategy_context === "fundamental_quality_and_valuation" && rec.fundamentals && (
+                <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                  {rec.fundamentals.pe_ratio != null && <span>P/E {Number(rec.fundamentals.pe_ratio).toFixed(1)}</span>}
+                  {rec.fundamentals.roe != null && <span>ROE {(Number(rec.fundamentals.roe) * 100).toFixed(1)}%</span>}
+                  {rec.fundamentals.revenue_growth != null && <span>Revenue growth {(Number(rec.fundamentals.revenue_growth) * 100).toFixed(1)}%</span>}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
@@ -111,6 +126,10 @@ function RecommendationCard({ rec }: { rec: any }) {
                 try {
                   await openPaperTrade({
                     ticker: rec.ticker,
+                    trading_mode: rec.trading_mode || "equity_swing",
+                    stop_loss: rec.trade_plan?.stop_loss,
+                    target: rec.trade_plan?.target,
+                    enforce_risk: true,
                     source: "recommendation",
                     strategy: "Recommendation Engine (combined signals)",
                     signal: rec.direction,
@@ -134,7 +153,7 @@ function RecommendationCard({ rec }: { rec: any }) {
             >
               <FlaskConical className="h-3 w-3 mr-1" /> Track
             </Button>
-            <Link href={`/analysis?ticker=${rec.ticker}`}>
+            <Link href={`/analysis?ticker=${rec.ticker}&mode=${rec.trading_mode || "equity_swing"}`}>
               <Button size="sm" variant="outline" title="Run full AI analysis (costs ~Rs.15-25, takes 1-3 min)">
                 <Target className="h-3 w-3 mr-1" /> AI Analyze
               </Button>
@@ -174,16 +193,22 @@ function RecommendationCard({ rec }: { rec: any }) {
 }
 
 export default function RecommendationsPage() {
+  const [tradingMode, setTradingMode] = useState<"equity_long_term" | "equity_swing">("equity_swing");
   const [universe, setUniverse] = useState("nifty100");
   const [minSignals, setMinSignals] = useState(2);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
 
+  useEffect(() => {
+    const mode = new URLSearchParams(window.location.search).get("mode");
+    if (mode === "equity_long_term" || mode === "equity_swing") setTradingMode(mode);
+  }, []);
+
   const handleRun = async () => {
     setLoading(true);
     setData(null);
     try {
-      const result: any = await getRecommendations(universe, minSignals);
+      const result: any = await getRecommendations(universe, minSignals, tradingMode);
       setData(result);
     } catch (e: any) {
       toast.error(e.message || "Failed to get recommendations");
@@ -200,10 +225,12 @@ export default function RecommendationsPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-yellow-500" /> Recommendations
+           <Sparkles className="h-6 w-6 text-yellow-500" /> {tradingMode === "equity_long_term" ? "Equity Long-term" : "Equity Swing"}
         </h1>
         <p className="text-sm text-muted-foreground">
-          AI-free unified recommendation engine. Combines ALL signals (gaps, volume, breakouts, S/R, RSI, cyclical, trend) into ranked trade ideas. FREE.
+           {tradingMode === "equity_long_term"
+             ? "Long-horizon equity research with a larger historical context. Validate fundamentals and portfolio fit before investing."
+             : "Technical equity swing setups using gaps, volume, breakouts, support/resistance, RSI and trend signals."} FREE.
         </p>
       </div>
 
@@ -211,6 +238,13 @@ export default function RecommendationsPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex gap-3 items-end flex-wrap">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Trading mode</label>
+              <div className="flex gap-1">
+                <Button variant={tradingMode === "equity_long_term" ? "default" : "outline"} size="sm" onClick={() => setTradingMode("equity_long_term")} disabled={loading}>Long-term</Button>
+                <Button variant={tradingMode === "equity_swing" ? "default" : "outline"} size="sm" onClick={() => setTradingMode("equity_swing")} disabled={loading}>Swing</Button>
+              </div>
+            </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Universe</label>
               <div className="flex gap-1">

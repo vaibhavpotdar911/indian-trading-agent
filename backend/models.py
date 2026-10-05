@@ -8,6 +8,7 @@ from datetime import datetime
 class AnalysisRequest(BaseModel):
     ticker: str
     trade_date: str
+    trading_mode: str = "equity_swing"
     analysts: list[str] = ["market", "social", "news", "fundamentals"]
     max_debate_rounds: int = 1
     max_risk_discuss_rounds: int = 1

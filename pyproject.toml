@@ -31,6 +31,7 @@ dependencies = [
     "yfinance>=0.2.63",
     "python-dotenv>=1.0.0",
     "kiteconnect>=5.0.1",
+    "kotakneoapi==3.0.7",
 ]
 
 [project.scripts]

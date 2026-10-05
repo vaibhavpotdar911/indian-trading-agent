@@ -390,6 +390,8 @@ function EquityPortfolioAnalysisContent() {
   const [kotakMobileNumber, setKotakMobileNumber] = useState("");
   const [kotakPanDob, setKotakPanDob] = useState("");
   const [kotakMpinPassword, setKotakMpinPassword] = useState("");
+  const [kotakUcc, setKotakUcc] = useState("");
+  const [kotakTotp, setKotakTotp] = useState("");
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
@@ -548,12 +550,17 @@ function EquityPortfolioAnalysisContent() {
   const loginKotakSession = async () => {
     setLoggingInKotak(true);
     try {
-      const res = (await loginKotakNeo({ mpin_or_password: kotakMpinPassword })) as {
+        const res = (await loginKotakNeo({
+          mpin_or_password: kotakMpinPassword,
+          ucc: kotakUcc || undefined,
+          totp: kotakTotp || undefined,
+        })) as {
         connected: boolean;
         kotak_neo: KotakNeoStatus;
       };
       setKotakNeoStatus(res.kotak_neo);
       setKotakMpinPassword("");
+      setKotakTotp("");
       toast.success("Logged in to Kotak Neo for today");
     } catch (e: unknown) {
       toast.error(errorMessage(e, "Kotak Neo session login failed"));
@@ -1047,8 +1054,19 @@ function EquityPortfolioAnalysisContent() {
                             <div className="space-y-3 border rounded-lg p-4 bg-muted/10">
                               <h4 className="font-medium text-xs text-muted-foreground uppercase tracking-wider">2. Daily Session Login</h4>
                               <p className="text-xs text-muted-foreground">
-                                Enter your MPIN or Password to initialize session token for today&apos;s holdings fetch.
+                                Kotak Neo SDK v3 requires UCC + current TOTP, followed by MPIN. Leave UCC/TOTP blank only for legacy session-token compatibility.
                               </p>
+                              <Input
+                                placeholder="Client UCC"
+                                value={kotakUcc}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKotakUcc(e.target.value.toUpperCase())}
+                              />
+                              <Input
+                                placeholder="6-digit TOTP"
+                                inputMode="numeric"
+                                value={kotakTotp}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKotakTotp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                              />
                               <Input
                                 placeholder="Kotak Neo MPIN or Password"
                                 type="password"

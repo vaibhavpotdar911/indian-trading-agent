@@ -43,6 +43,7 @@ def ensure_db():
                 task_id TEXT PRIMARY KEY,
                 ticker TEXT NOT NULL,
                 trade_date TEXT NOT NULL,
+                trading_mode TEXT DEFAULT 'equity_swing',
                 signal TEXT,
                 status TEXT DEFAULT 'completed',
                 error_message TEXT,
@@ -71,6 +72,7 @@ def ensure_db():
             CREATE TABLE IF NOT EXISTS backtest_runs (
                 backtest_id TEXT PRIMARY KEY,
                 ticker TEXT NOT NULL,
+                trading_mode TEXT DEFAULT 'equity_swing',
                 initial_capital REAL DEFAULT 100000,
                 position_size_pct REAL DEFAULT 10,
                 enable_learning BOOLEAN DEFAULT 0,
@@ -89,6 +91,7 @@ def ensure_db():
                 backtest_id TEXT NOT NULL,
                 trade_date TEXT NOT NULL,
                 ticker TEXT NOT NULL,
+                trading_mode TEXT DEFAULT 'equity_swing',
                 signal TEXT,
                 entry_price REAL,
                 exit_price REAL,
@@ -147,6 +150,7 @@ def ensure_db():
             CREATE TABLE IF NOT EXISTS paper_trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker TEXT NOT NULL,
+                trading_mode TEXT DEFAULT 'equity_swing',
                 source TEXT,                        -- "recommendation" | "manual" | "scanner" | "ai_analysis"
                 strategy TEXT,                      -- Human-readable: "Recommendation Engine", "Gap Scanner", "AI Pipeline", etc.
                 direction TEXT,                     -- "LONG" | "SHORT"
@@ -155,7 +159,12 @@ def ensure_db():
                 confidence TEXT,                    -- HIGH | MEDIUM | LOW
                 success_probability INTEGER,
                 triggered_signals TEXT,             -- JSON: list of specific signal names that fired
-                entry_price REAL NOT NULL,
+                 entry_price REAL NOT NULL,
+                 stop_loss REAL,
+                 target REAL,
+                 quantity REAL,
+                 capital REAL,
+                 realized_pnl_amount REAL,
                 entry_date TEXT DEFAULT (date('now')),
                 entry_datetime TEXT DEFAULT (datetime('now')),
                 price_1d REAL,                      -- price 1 trading day later
@@ -232,6 +241,7 @@ def ensure_db():
                 run_id TEXT NOT NULL,
                 trade_date TEXT NOT NULL,
                 ticker TEXT NOT NULL,
+                trading_mode TEXT DEFAULT 'equity_swing',
                 signal TEXT,
                 score REAL,
                 confidence TEXT,
@@ -257,6 +267,20 @@ def get_db():
         conn.commit()
     finally:
         conn.close()
+
+
+def _migrate_trading_mode_columns():
+    """Add trading-mode columns to databases created before mode support."""
+    with get_db() as conn:
+        for table in ("backtest_runs", "backtest_trades", "recommender_backtests"):
+            existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            if "trading_mode" not in existing:
+                try:
+                    conn.execute(
+                        f"ALTER TABLE {table} ADD COLUMN trading_mode TEXT DEFAULT 'equity_swing'"
+                    )
+                except Exception:
+                    pass
 
 
 # --- Watchlist ---
@@ -296,6 +320,11 @@ def _migrate_analysis_history_columns():
                 conn.execute("ALTER TABLE analysis_history ADD COLUMN error_message TEXT")
             except Exception:
                 pass
+        if "trading_mode" not in existing:
+            try:
+                conn.execute("ALTER TABLE analysis_history ADD COLUMN trading_mode TEXT DEFAULT 'equity_swing'")
+            except Exception:
+                pass
 
 
 def save_analysis(task_id: str, data: dict):
@@ -303,16 +332,17 @@ def save_analysis(task_id: str, data: dict):
     with get_db() as conn:
         conn.execute(
             """INSERT OR REPLACE INTO analysis_history
-            (task_id, ticker, trade_date, signal, status, error_message,
+            (task_id, ticker, trade_date, trading_mode, signal, status, error_message,
              market_report, sentiment_report, news_report, fundamentals_report,
              investment_plan, trader_investment_plan, final_trade_decision,
              bull_history, bear_history, risk_aggressive_history,
              risk_conservative_history, risk_neutral_history, stats, duration_seconds)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 task_id,
                 data.get("ticker"),
                 data.get("trade_date"),
+                data.get("trading_mode", "equity_swing"),
                 data.get("signal"),
                 data.get("status", "completed"),
                 data.get("error_message"),
@@ -379,7 +409,7 @@ def get_analysis_history(limit: int = 50, offset: int = 0) -> list[dict]:
         )
 
         rows = conn.execute(
-            """SELECT task_id, ticker, trade_date, signal, status, error_message, duration_seconds,
+            """SELECT task_id, ticker, trade_date, trading_mode, signal, status, error_message, duration_seconds,
                       entry_price, exit_price, pnl_pct, pnl_status, created_at
                FROM analysis_history ORDER BY created_at DESC LIMIT ? OFFSET ?""",
             (limit, offset),
@@ -390,16 +420,18 @@ def get_analysis_history(limit: int = 50, offset: int = 0) -> list[dict]:
 # --- Backtest ---
 
 def save_backtest_run(backtest_id: str, data: dict):
+    _migrate_trading_mode_columns()
     with get_db() as conn:
         conn.execute(
             """INSERT OR REPLACE INTO backtest_runs
-            (backtest_id, ticker, initial_capital, position_size_pct, enable_learning,
+            (backtest_id, ticker, trading_mode, initial_capital, position_size_pct, enable_learning,
              total_trades, winning_trades, losing_trades, total_return_pct,
              max_drawdown_pct, final_portfolio_value, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 backtest_id,
                 data.get("ticker"),
+                data.get("trading_mode", "equity_swing"),
                 data.get("initial_capital"),
                 data.get("position_size_pct"),
                 data.get("enable_learning"),
@@ -415,16 +447,18 @@ def save_backtest_run(backtest_id: str, data: dict):
 
 
 def save_backtest_trade(backtest_id: str, trade: dict):
+    _migrate_trading_mode_columns()
     with get_db() as conn:
         conn.execute(
             """INSERT INTO backtest_trades
-            (backtest_id, trade_date, ticker, signal, entry_price, exit_price,
+            (backtest_id, trade_date, ticker, trading_mode, signal, entry_price, exit_price,
              pnl_amount, pnl_pct, cumulative_pnl, portfolio_value, duration_seconds)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 backtest_id,
                 trade.get("trade_date"),
                 trade.get("ticker"),
+                trade.get("trading_mode", "equity_swing"),
                 trade.get("signal"),
                 trade.get("entry_price"),
                 trade.get("exit_price"),
@@ -438,12 +472,14 @@ def save_backtest_trade(backtest_id: str, trade: dict):
 
 
 def get_backtest_run(backtest_id: str) -> dict | None:
+    _migrate_trading_mode_columns()
     with get_db() as conn:
         row = conn.execute("SELECT * FROM backtest_runs WHERE backtest_id = ?", (backtest_id,)).fetchone()
         return dict(row) if row else None
 
 
 def get_backtest_trades(backtest_id: str) -> list[dict]:
+    _migrate_trading_mode_columns()
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM backtest_trades WHERE backtest_id = ? ORDER BY trade_date",
@@ -453,6 +489,7 @@ def get_backtest_trades(backtest_id: str) -> list[dict]:
 
 
 def get_backtest_history(limit: int = 20) -> list[dict]:
+    _migrate_trading_mode_columns()
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM backtest_runs ORDER BY created_at DESC LIMIT ?", (limit,)
@@ -803,11 +840,13 @@ def add_paper_trade(data: dict) -> int:
     with get_db() as conn:
         cursor = conn.execute(
             """INSERT INTO paper_trades
-            (ticker, source, strategy, direction, signal, score, confidence,
-             success_probability, triggered_signals, entry_price, notes, regime_at_entry)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticker, trading_mode, source, strategy, direction, signal, score, confidence,
+             success_probability, triggered_signals, entry_price, stop_loss, target,
+             quantity, capital, notes, regime_at_entry)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 data.get("ticker"),
+                data.get("trading_mode", "equity_swing"),
                 data.get("source", "manual"),
                 data.get("strategy"),
                 data.get("direction", "LONG"),
@@ -817,6 +856,10 @@ def add_paper_trade(data: dict) -> int:
                 data.get("success_probability"),
                 triggered,
                 data.get("entry_price"),
+                data.get("stop_loss"),
+                data.get("target"),
+                data.get("quantity"),
+                data.get("capital"),
                 data.get("notes"),
                 regime_at_entry,
             ),
@@ -829,6 +872,12 @@ def _migrate_paper_trades_columns():
     with get_db() as conn:
         existing = {row["name"] for row in conn.execute("PRAGMA table_info(paper_trades)").fetchall()}
         for col, ddl in [
+            ("trading_mode", "TEXT DEFAULT 'equity_swing'"),
+            ("stop_loss", "REAL"),
+            ("target", "REAL"),
+            ("quantity", "REAL"),
+            ("capital", "REAL"),
+            ("realized_pnl_amount", "REAL"),
             ("strategy", "TEXT"),
             ("confidence", "TEXT"),
             ("triggered_signals", "TEXT"),
@@ -923,16 +972,18 @@ def delete_paper_trade(trade_id: int):
 # --- Recommender Backtest ---
 
 def save_recommender_backtest_row(data: dict):
+    _migrate_trading_mode_columns()
     with get_db() as conn:
         conn.execute(
             """INSERT INTO recommender_backtests
-            (run_id, trade_date, ticker, signal, score, confidence, success_probability,
+            (run_id, trade_date, ticker, trading_mode, signal, score, confidence, success_probability,
              entry_price, return_1d, return_3d, return_5d, return_10d, outcome_1d, outcome_5d)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 data.get("run_id"),
                 data.get("trade_date"),
                 data.get("ticker"),
+                data.get("trading_mode", "equity_swing"),
                 data.get("signal"),
                 data.get("score"),
                 data.get("confidence"),
@@ -949,6 +1000,7 @@ def save_recommender_backtest_row(data: dict):
 
 
 def get_recommender_backtest(run_id: str) -> list[dict]:
+    _migrate_trading_mode_columns()
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM recommender_backtests WHERE run_id = ? ORDER BY trade_date, ticker",

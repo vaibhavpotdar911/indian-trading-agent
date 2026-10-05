@@ -18,6 +18,12 @@ from tradingagents.utils.ticker import normalize_ticker
 MARKET_DATA_VENDOR_KEY = "market_data_vendor"
 
 
+def fetch_historical_ohlcv(symbol: str, exchange: str, interval: str, from_date: str, to_date: str) -> list[dict[str, Any]]:
+    """Fetch daily/weekly history through the configured Kotak SDK session."""
+    from backend.brokers.kotak_neo import fetch_historical_ohlcv as _fetch
+    return _fetch(symbol, exchange, interval, from_date, to_date)
+
+
 def _today() -> str:
     return date.today().isoformat()
 
@@ -203,12 +209,21 @@ def _fetch_upstox_quote(ticker: str) -> dict[str, Any] | None:
 
 
 def _fetch_kotak_quote(ticker: str) -> dict[str, Any] | None:
+    from backend.brokers.kotak_neo import fetch_sdk_quote
+    symbol, exchange = _clean_ticker_symbol(ticker)
+    try:
+        # SDK v3 is the primary path. The old REST path remains below as a
+        # compatibility fallback for sessions created before the SDK upgrade.
+        sdk_quote = fetch_sdk_quote(symbol, exchange)
+        if sdk_quote:
+            return sdk_quote
+    except Exception:
+        pass
     from backend.brokers.kotak_neo import get_authenticated_headers
     try:
         headers = get_authenticated_headers()
     except Exception:
         return None
-    symbol, exchange = _clean_ticker_symbol(ticker)
     url = f"https://gw-napi.kotaksecurities.com/trade/1.0/quotes?symbol={symbol}&exchange={exchange}"
     try:
         with httpx.Client(timeout=8.0) as client:

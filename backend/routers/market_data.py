@@ -36,6 +36,7 @@ from pydantic import BaseModel
 
 from backend.market_data_provider import (
     fetch_quote,
+    fetch_historical_ohlcv,
     get_vendor_status,
     set_vendor_setting,
 )
@@ -93,6 +94,19 @@ def get_chart_data(
 ):
     """Get OHLCV chart data for a ticker."""
     symbol = normalize_ticker(ticker)
+    if period in ("1d", "5d", "1mo", "3mo", "6mo", "1y", "2y"):
+        try:
+            from backend.market_data_provider import resolve_active_vendor
+            vendor, _, _ = resolve_active_vendor()
+            if vendor == "kotak_neo" and interval in ("1d", "1wk"):
+                end = datetime.now().date()
+                days = {"1d": 1, "5d": 5, "1mo": 31, "3mo": 93, "6mo": 186, "1y": 366, "2y": 732}[period]
+                start = end - timedelta(days=days)
+                candles = fetch_historical_ohlcv(symbol, "NSE", "D" if interval == "1d" else "W", start.isoformat(), end.isoformat())
+                if candles:
+                    return {"ticker": symbol, "period": period, "interval": interval, "data": candles, "vendor_used": "Kotak Neo SDK 3.0.7"}
+        except Exception:
+            pass
     t = yf.Ticker(symbol)
     hist = t.history(period=period, interval=interval)
 

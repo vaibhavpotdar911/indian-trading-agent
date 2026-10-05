@@ -5,6 +5,7 @@ import { runAnalysis, connectAnalysisWS, getAnalysisResult } from "@/lib/api";
 import type { WSEvent } from "@/lib/types";
 
 interface AnalysisOptions {
+  trading_mode?: "equity_long_term" | "equity_swing";
   analysts?: string[];
   max_debate_rounds?: number;
   max_risk_discuss_rounds?: number;
@@ -93,6 +94,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       const result: any = await runAnalysis({
         ticker,
         trade_date: tradeDate,
+        trading_mode: options.trading_mode,
         analysts: options.analysts,
         max_debate_rounds: options.max_debate_rounds,
         max_risk_discuss_rounds: options.max_risk_discuss_rounds,
@@ -263,4 +265,3 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     });
   },
 }));
-

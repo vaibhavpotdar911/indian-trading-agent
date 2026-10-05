@@ -21,9 +21,11 @@ import {
   Newspaper,
   Brain,
   PieChart,
+  BriefcaseBusiness,
   LogOut,
   Menu,
   X,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,8 @@ const navGroups: NavGroup[] = [
     title: "DISCOVER",
     items: [
       { href: "/recommendations", label: "Top Picks", icon: Sparkles, hint: "AI-free recommendations" },
+      { href: "/equity-long-term", label: "Equity Long-term", icon: BriefcaseBusiness, hint: "Fundamental portfolio ideas" },
+      { href: "/equity-swing", label: "Equity Swing", icon: TrendingUp, hint: "Technical swing setups" },
       { href: "/scanner", label: "Market Scan", icon: Radar, hint: "Gap / Volume / Breakout" },
       { href: "/strategies", label: "Strategies", icon: Target, hint: "S/R, Cyclical patterns" },
       { href: "/news", label: "News Feed", icon: Newspaper, hint: "RSS + customizable" },
@@ -75,6 +79,8 @@ const navGroups: NavGroup[] = [
       { href: "/shadow-trades", label: "Shadow Trades", icon: Search, hint: "Counterfactual: trades you skipped" },
       { href: "/memory-admin", label: "Memory Admin", icon: Brain, hint: "Inspect + prune agent BM25 memories" },
       { href: "/backtest", label: "AI Backtest", icon: FlaskConical, hint: "AI on past dates (paid)" },
+      { href: "/realistic-backtest", label: "Realistic Backtest", icon: ShieldCheck, hint: "Costs, slippage, drawdown" },
+      { href: "/fundamental-backtest", label: "Fundamental Backtest", icon: TrendingUp, hint: "Long-term valuation signals" },
       { href: "/history", label: "My Trades", icon: History, hint: "Real trades & P&L" },
     ],
   },
@@ -224,4 +230,3 @@ export function Sidebar() {
     </>
   );
 }
-

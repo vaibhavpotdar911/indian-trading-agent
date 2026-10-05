@@ -54,6 +54,7 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
         current_result = {
             "ticker": ticker,
             "trade_date": trade_date,
+            "trading_mode": config.get("trading_mode", "equity_swing"),
             "signal": "ANALYZING...",
             "duration_seconds": 0,
         }
@@ -191,6 +192,7 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
         result_data = {
             "ticker": ticker,
             "trade_date": trade_date,
+            "trading_mode": config.get("trading_mode", "equity_swing"),
             "signal": signal,
             "market_report": final_state.get("market_report"),
             "sentiment_report": final_state.get("sentiment_report"),
@@ -245,12 +247,14 @@ def run_analysis(req: AnalysisRequest):
     config["max_debate_rounds"] = req.max_debate_rounds
     config["max_risk_discuss_rounds"] = req.max_risk_discuss_rounds
     config["output_language"] = req.output_language
+    config["trading_mode"] = req.trading_mode
 
     _tasks[task_id] = {
         "status": "pending",
         "ticker": ticker,
         "trade_date": req.trade_date,
         "analysts": req.analysts,
+        "trading_mode": req.trading_mode,
         "start_time": time.time(),
     }
 
@@ -473,4 +477,3 @@ def list_analysis_history(limit: int = 50, offset: int = 0):
                 })
 
     return running_tasks + db_history
-

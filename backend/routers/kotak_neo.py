@@ -24,6 +24,8 @@ class KotakNeoCredentials(BaseModel):
 class KotakNeoLoginRequest(BaseModel):
     mpin_or_password: str
     session_token: str | None = None
+    ucc: str | None = None
+    totp: str | None = None
 
 
 @router.get("/status")
@@ -47,7 +49,7 @@ def credentials(data: KotakNeoCredentials):
 @router.post("/login")
 def login(data: KotakNeoLoginRequest):
     try:
-        return login_kotak_neo(data.mpin_or_password, data.session_token)
+        return login_kotak_neo(data.mpin_or_password, data.session_token, data.ucc, data.totp)
     except KotakNeoConfigError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

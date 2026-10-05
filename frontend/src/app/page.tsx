@@ -13,6 +13,7 @@ import { CalendarBanner } from "@/components/dashboard/CalendarBanner";
 import { ConcentrationWidget } from "@/components/dashboard/ConcentrationWidget";
 import { DailyVerdict } from "@/components/dashboard/DailyVerdict";
 import { RegimeBadge } from "@/components/dashboard/RegimeBadge";
+import { RiskMonitor } from "@/components/dashboard/RiskMonitor";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -63,6 +64,8 @@ export default function DashboardPage() {
 
       {/* Sector Concentration Widget — auto-hides if no open positions */}
       <ConcentrationWidget />
+
+      <RiskMonitor />
 
       {/* Today's Top Picks — auto-loaded */}
       <TodayPicks universe="nifty100" />

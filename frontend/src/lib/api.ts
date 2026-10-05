@@ -2,7 +2,7 @@
  * Use an explicitly configured backend for cross-origin local development. In a
  * deployed build, an empty value keeps API and WebSocket traffic same-origin.
  */
-function getApiBase(): string {
+export function getApiBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "");
   if (configured) return configured;
 
@@ -16,6 +16,11 @@ function getApiBase(): string {
     return `${window.location.protocol}//${hostname}${portSuffix}`;
   }
   return "";
+}
+
+export function getKotakFeedUrl(ticker: string, exchange = "NSE"): string {
+  const base = getApiBase().replace(/^http/, "ws");
+  return `${base}/ws/kotak-neo/feed/${encodeURIComponent(ticker)}?exchange=${exchange}`;
 }
 
 function getWebSocketBase(): string {
@@ -120,6 +125,7 @@ export const getMarketStatus = () => fetchAPI(`/api/market-data/market-status`);
 export const runAnalysis = (data: {
   ticker: string;
   trade_date: string;
+  trading_mode?: "equity_long_term" | "equity_swing";
   analysts?: string[];
   max_debate_rounds?: number;
   max_risk_discuss_rounds?: number;
@@ -140,6 +146,28 @@ export const removeFromWatchlist = (ticker: string) =>
 
 // Config
 export const getConfig = () => fetchAPI(`/api/config`);
+export const getTradingModes = () => fetchAPI(`/api/trading-modes`);
+export const getRiskProfile = (tradingMode = "equity_swing") => fetchAPI(`/api/risk/profile?trading_mode=${tradingMode}`);
+export const getRiskSummary = (tradingMode = "equity_swing") => fetchAPI(`/api/risk/summary?trading_mode=${tradingMode}`);
+export const saveRiskProfile = (data: {
+  trading_mode: "equity_long_term" | "equity_swing";
+  capital: number;
+  max_risk_per_trade_pct: number;
+  max_position_pct: number;
+  max_daily_loss_pct: number;
+  max_open_positions: number;
+}) => fetchAPI(`/api/risk/profile`, { method: "PUT", body: JSON.stringify(data) });
+export const getTradingLock = () => fetchAPI(`/api/risk/lock`);
+export const setTradingLock = (locked: boolean) => fetchAPI(`/api/risk/lock`, { method: "PUT", body: JSON.stringify({ locked }) });
+export const checkTradeRisk = (data: {
+  trading_mode?: "equity_long_term" | "equity_swing";
+  entry_price: number;
+  stop_loss?: number;
+  quantity?: number;
+  direction?: string;
+  capital?: number;
+  ticker?: string;
+}) => fetchAPI(`/api/risk/check`, { method: "POST", body: JSON.stringify(data) });
 
 // Application session. Credentials are supplied at runtime by the user and
 // are never included in the client build or persisted by the frontend.
@@ -177,7 +205,7 @@ export const saveKotakNeoCredentials = (data: {
   mobile_number: string;
   pan_or_dob?: string;
 }) => fetchAPI(`/api/kotak-neo/credentials`, { method: "PUT", body: JSON.stringify(data) });
-export const loginKotakNeo = (data: { mpin_or_password: string; session_token?: string }) =>
+export const loginKotakNeo = (data: { mpin_or_password: string; session_token?: string; ucc?: string; totp?: string }) =>
   fetchAPI(`/api/kotak-neo/login`, { method: "POST", body: JSON.stringify(data) });
 export const logoutKotakNeo = () => fetchAPI(`/api/kotak-neo/logout`, { method: "POST" });
 
@@ -235,6 +263,8 @@ export const deletePosition = (exchange: string, symbol: string) =>
 
 // Settings — API Keys & LLM Config
 export const getApiKeys = () => fetchAPI(`/api/settings/api-keys`);
+export const getDataProviderKeys = () => fetchAPI(`/api/settings/data-provider-keys`);
+export const saveDataProviderKey = (provider: string, key: string) => fetchAPI(`/api/settings/data-provider-keys`, { method: "PUT", body: JSON.stringify({ provider, key }) });
 export const saveApiKey = (provider: string, key: string) =>
   fetchAPI(`/api/settings/api-keys`, {
     method: "PUT",
@@ -331,6 +361,12 @@ export const backtestSeasonal = (ticker: string, buyMonths: string, sellMonths: 
 // Simulation (Paper Trading + Historical Backtest)
 export const openPaperTrade = (data: {
   ticker: string;
+  trading_mode?: "equity_long_term" | "equity_swing";
+  stop_loss?: number;
+  target?: number;
+  quantity?: number;
+  capital?: number;
+  enforce_risk?: boolean;
   source?: string;
   signal?: string;
   score?: number;
@@ -338,13 +374,19 @@ export const openPaperTrade = (data: {
   notes?: string;
 }) => fetchAPI(`/api/simulation/paper-trade`, { method: "POST", body: JSON.stringify(data) });
 
-export const listPaperTrades = (status?: string) =>
-  fetchAPI(`/api/simulation/paper-trades${status ? `?status=${status}` : ""}`);
+export const listPaperTrades = (status?: string, tradingMode?: "equity_long_term" | "equity_swing") => {
+  const q = new URLSearchParams();
+  if (status) q.set("status", status);
+  if (tradingMode) q.set("trading_mode", tradingMode);
+  const query = q.toString();
+  return fetchAPI(`/api/simulation/paper-trades${query ? `?${query}` : ""}`);
+};
 
 export const refreshPaperTrades = () =>
   fetchAPI(`/api/simulation/paper-trades/refresh`, { method: "POST" });
 
-export const getPaperTradingStats = () => fetchAPI(`/api/simulation/paper-trades/stats`);
+export const getPaperTradingStats = (tradingMode?: "equity_long_term" | "equity_swing") =>
+  fetchAPI(`/api/simulation/paper-trades/stats${tradingMode ? `?trading_mode=${tradingMode}` : ""}`);
 
 export const deletePaperTrade = (tradeId: number) =>
   fetchAPI(`/api/simulation/paper-trades/${tradeId}`, { method: "DELETE" });
@@ -357,12 +399,14 @@ export const runRecommenderBacktest = (params: {
   start_date?: string;
   end_date?: string;
   interval_days?: number;
+  trading_mode?: "equity_long_term" | "equity_swing";
 }) => {
   const q = new URLSearchParams();
   if (params.universe) q.set("universe", params.universe);
   if (params.start_date) q.set("start_date", params.start_date);
   if (params.end_date) q.set("end_date", params.end_date);
   if (params.interval_days) q.set("interval_days", String(params.interval_days));
+  if (params.trading_mode) q.set("trading_mode", params.trading_mode);
   return fetchAPI(`/api/simulation/recommender-backtest?${q.toString()}`, { method: "POST" });
 };
 
@@ -373,10 +417,10 @@ export const listRecommenderBacktests = () =>
   fetchAPI(`/api/simulation/recommender-backtest-history`);
 
 // Recommendations
-export const getRecommendations = (universe = "nifty100", minSignals = 2) =>
-  fetchAPI(`/api/recommend/?universe=${universe}&min_signals=${minSignals}`);
-export const analyzeRecommendation = (ticker: string) =>
-  fetchAPI(`/api/recommend/stock/${ticker}`);
+export const getRecommendations = (universe = "nifty100", minSignals = 2, tradingMode = "equity_swing") =>
+  fetchAPI(`/api/recommend/?universe=${universe}&min_signals=${minSignals}&trading_mode=${tradingMode}`);
+export const analyzeRecommendation = (ticker: string, tradingMode = "equity_swing") =>
+  fetchAPI(`/api/recommend/stock/${ticker}?trading_mode=${tradingMode}`);
 
 // Signal Performance (per-signal win rate + auto-tune)
 export const getSignalPerformance = (windowDays = 90) =>
@@ -484,6 +528,7 @@ export function connectScannerWS<T = unknown>(scanId: string, onEvent: (event: T
 // Backtest
 export const startBacktest = (data: {
   ticker: string;
+  trading_mode?: "equity_long_term" | "equity_swing";
   start_date: string;
   end_date: string;
   interval_days?: number;
@@ -491,6 +536,28 @@ export const startBacktest = (data: {
   position_size_pct?: number;
   enable_learning?: boolean;
 }) => fetchAPI(`/api/backtest/run`, { method: "POST", body: JSON.stringify(data) });
+export const runRealisticBacktest = (data: {
+  ticker: string;
+  trading_mode?: "equity_long_term" | "equity_swing";
+  start_date?: string;
+  end_date?: string;
+  initial_capital?: number;
+  risk_per_trade_pct?: number;
+  max_position_pct?: number;
+  slippage_bps?: number;
+  round_trip_cost_bps?: number;
+  max_hold_days?: number;
+}) => fetchAPI(`/api/realistic-backtest/run`, { method: "POST", body: JSON.stringify(data) });
+export const runFundamentalBacktest = (data: {
+  ticker: string;
+  start_date?: string;
+  end_date?: string;
+  initial_capital?: number;
+  reporting_lag_days?: number;
+  rebalance_days?: number;
+  slippage_bps?: number;
+  round_trip_cost_bps?: number;
+}) => fetchAPI(`/api/fundamental-backtest/run`, { method: "POST", body: JSON.stringify(data) });
 
 export const getBacktestResult = (backtestId: string) => fetchAPI(`/api/backtest/${backtestId}`);
 export const getBacktestHistory = (limit = 20) => fetchAPI(`/api/backtest/history/list?limit=${limit}`);

@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 
 from backend.db import get_db, get_setting, set_setting
+from tradingagents.utils.ticker import normalize_ticker
 
 
 KOTAK_NEO_CONSUMER_KEY = "kotak_neo_consumer_key"
@@ -24,6 +25,8 @@ KOTAK_NEO_PAN_OR_DOB = "kotak_neo_pan_or_dob"
 KOTAK_NEO_ACCESS_TOKEN = "kotak_neo_access_token"
 KOTAK_NEO_ACCESS_TOKEN_DATE = "kotak_neo_access_token_date"
 KOTAK_NEO_PROFILE = "kotak_neo_profile"
+KOTAK_NEO_SESSION_ID = "kotak_neo_session_id"
+KOTAK_NEO_UCC = "kotak_neo_ucc"
 
 KOTAK_NEO_BASE_URL = "https://gw-napi.kotaksecurities.com"
 KOTAK_NEO_HOLDINGS_URL = f"{KOTAK_NEO_BASE_URL}/trade/1.0/holdings"
@@ -138,9 +141,118 @@ def save_kotak_neo_credentials(
 def clear_kotak_neo_access_token():
     set_setting(KOTAK_NEO_ACCESS_TOKEN, None)
     set_setting(KOTAK_NEO_ACCESS_TOKEN_DATE, None)
+    set_setting(KOTAK_NEO_SESSION_ID, None)
 
 
-def login_kotak_neo(password_or_mpin: str, session_token: str | None = None) -> dict:
+def get_sdk_client():
+    """Create the official kotakneoapi 3.x client for the current session.
+
+    The distribution is named ``kotakneoapi`` but deliberately exposes the
+    import ``neo_api_client``.  Keeping this import lazy means installations
+    that only use Yahoo data can still start and report a useful fallback.
+    """
+    token = _access_token()
+    if not token and not _consumer_key():
+        raise KotakNeoConfigError("Kotak Neo consumer key is not configured")
+    from neo_api_client import NeoAPI
+    client = NeoAPI(consumer_key=_consumer_key(), access_token=token or None, neo_fin_key="neotradeapi")
+    # A token restored from SQLite does not automatically restore the session
+    # id required by the v3 SFeed WebSocket.
+    session_id = get_setting(KOTAK_NEO_SESSION_ID)
+    if session_id:
+        client.configuration.edit_sid = session_id
+        client.configuration.edit_token = token
+    return client
+
+
+def fetch_historical_ohlcv(
+    symbol: str,
+    exchange: str = "NSE",
+    interval: str = "D",
+    from_date: str = "",
+    to_date: str = "",
+) -> list[dict[str, Any]]:
+    """Fetch historical candles through kotakneoapi 3.x when available."""
+    resolved = search_scrip_token(symbol, exchange)
+    if not resolved:
+        return []
+    segment, token = resolved
+    response = get_sdk_client().historical_data(
+        f"{segment}|{token}", interval, from_date, to_date
+    )
+    rows = response.get("data", response) if isinstance(response, dict) else response
+    if not isinstance(rows, list):
+        return []
+    candles = []
+    for row in rows:
+        if isinstance(row, dict):
+            date_value = row.get("date") or row.get("timestamp") or row.get("time")
+            candles.append({
+                "time": date_value,
+                "open": _num(row.get("open") or row.get("Open")),
+                "high": _num(row.get("high") or row.get("High")),
+                "low": _num(row.get("low") or row.get("Low")),
+                "close": _num(row.get("close") or row.get("Close")),
+                "volume": int(_num(row.get("volume") or row.get("Volume"))),
+            })
+        elif isinstance(row, (list, tuple)) and len(row) >= 6:
+            candles.append({
+                "time": row[0], "open": _num(row[1]), "high": _num(row[2]),
+                "low": _num(row[3]), "close": _num(row[4]), "volume": int(_num(row[5])),
+            })
+    return candles
+
+
+def search_scrip_token(symbol: str, exchange: str = "NSE") -> tuple[str, str] | None:
+    """Resolve an equity symbol to the SDK instrument token."""
+    client = get_sdk_client()
+    segment = "nse_cm" if exchange.upper() == "NSE" else "bse_cm"
+    rows = client.search_scrip(exchange_segment=segment, symbol=symbol.upper())
+    if not isinstance(rows, list) or not rows:
+        return None
+    row = rows[0]
+    token = row.get("pToken") or row.get("pInstrumentToken") or row.get("instrument_token")
+    if token is None:
+        return None
+    return segment, str(token)
+
+
+def fetch_sdk_quote(symbol: str, exchange: str = "NSE") -> dict[str, Any] | None:
+    """Fetch a quote through kotakneoapi 3.x REST quote service."""
+    resolved = search_scrip_token(symbol, exchange)
+    if not resolved:
+        return None
+    segment, token = resolved
+    response = get_sdk_client().quotes(
+        instrument_tokens=[{"exchange_segment": segment, "instrument_token": token}],
+        quote_type="all",
+    )
+    rows = response.get("data", response) if isinstance(response, dict) else response
+    if isinstance(rows, dict):
+        rows = rows.get("data", [rows])
+    if not isinstance(rows, list) or not rows:
+        return None
+    quote = rows[0]
+    price = _num(quote.get("ltp") or quote.get("lastTradedPrice") or quote.get("last_price"))
+    if not price:
+        return None
+    previous = _num(quote.get("closePrice") or quote.get("close") or price)
+    return {
+        "ticker": normalize_ticker(symbol),
+        "name": symbol.upper(),
+        "price": round(price, 2),
+        "change": round(price - previous, 2),
+        "change_percent": round((price - previous) / previous * 100, 2) if previous else 0.0,
+        "volume": int(_num(quote.get("volume") or quote.get("volumeTradedToday"))),
+        "high": round(_num(quote.get("highPrice") or quote.get("high") or price), 2),
+        "low": round(_num(quote.get("lowPrice") or quote.get("low") or price), 2),
+        "open": round(_num(quote.get("openPrice") or quote.get("open") or price), 2),
+        "prev_close": round(previous, 2),
+        "vendor_used": "Kotak Neo SDK 3.0.7",
+    }
+
+
+def login_kotak_neo(password_or_mpin: str, session_token: str | None = None, ucc: str | None = None, totp: str | None = None) -> dict:
     """Session login for Kotak Neo using MPIN/password or token session."""
     c_key = _consumer_key()
     c_sec = _consumer_secret()
@@ -151,7 +263,27 @@ def login_kotak_neo(password_or_mpin: str, session_token: str | None = None) -> 
     if not c_key or not c_sec or not mobile:
         raise KotakNeoConfigError("Kotak Neo credentials are not configured")
 
-    if session_token:
+    if ucc and totp:
+        try:
+            from neo_api_client import NeoAPI
+            client = NeoAPI(consumer_key=c_key, environment="prod", neo_fin_key="neotradeapi")
+            first = client.totp_login(mobile_number=mobile, ucc=ucc.strip(), totp=totp.strip())
+            if "error" in first:
+                raise KotakNeoConfigError(str(first["error"]))
+            validated = client.totp_validate(mpin=mpin)
+            if "error" in validated:
+                raise KotakNeoConfigError(str(validated["error"]))
+            data = validated.get("data", {})
+            access_token = data.get("token")
+            if not access_token:
+                raise KotakNeoConfigError("Kotak SDK did not return an access token")
+            set_setting(KOTAK_NEO_UCC, ucc.strip())
+            set_setting(KOTAK_NEO_SESSION_ID, data.get("sid") or "")
+        except KotakNeoConfigError:
+            raise
+        except Exception as exc:
+            raise KotakNeoConfigError(f"Kotak Neo SDK login failed: {exc}") from exc
+    elif session_token:
         access_token = session_token.strip()
     else:
         if not mpin:

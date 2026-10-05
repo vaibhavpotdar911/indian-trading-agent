@@ -45,6 +45,7 @@ export interface WatchlistItem {
 export interface AnalysisRequest {
   ticker: string;
   trade_date: string;
+  trading_mode?: "equity_long_term" | "equity_swing";
   analysts: string[];
   max_debate_rounds: number;
   max_risk_discuss_rounds: number;
@@ -87,6 +88,7 @@ export interface AnalysisHistoryItem {
   task_id: string;
   ticker: string;
   trade_date: string;
+  trading_mode?: "equity_long_term" | "equity_swing";
   signal: string;
   status?: string;
   error_message?: string;

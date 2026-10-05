@@ -35,6 +35,12 @@ SOURCE_STRATEGY_MAP = {
 
 def open_paper_trade(
     ticker: str,
+    trading_mode: str = "equity_swing",
+    stop_loss: float | None = None,
+    target: float | None = None,
+    quantity: float | None = None,
+    capital: float | None = None,
+    enforce_risk: bool = False,
     source: str = "manual",
     strategy: str | None = None,
     signal: str = None,
@@ -62,10 +68,25 @@ def open_paper_trade(
     if not strategy:
         strategy = SOURCE_STRATEGY_MAP.get(source, source)
 
+    from backend.risk_engine import check_trade
+    risk_check = check_trade(
+        trading_mode=trading_mode,
+        entry_price=current_price,
+        stop_loss=stop_loss,
+        quantity=quantity,
+        direction=direction,
+        capital=capital,
+        ticker=ticker,
+    )
+    if enforce_risk and not risk_check["allowed"]:
+        return {"ok": False, "error": "Trade rejected by risk engine", "risk_check": risk_check}
+
     trade_id = add_paper_trade({
         "ticker": ticker.upper(),
+        "trading_mode": trading_mode,
         "source": source,
         "strategy": strategy,
+        "risk_check": risk_check,
         "direction": direction,
         "signal": signal,
         "score": score,
@@ -73,6 +94,10 @@ def open_paper_trade(
         "success_probability": success_probability,
         "triggered_signals": triggered_signals,
         "entry_price": round(current_price, 2),
+        "stop_loss": stop_loss,
+        "target": target,
+        "quantity": quantity,
+        "capital": capital,
         "notes": notes,
     })
 
@@ -107,16 +132,19 @@ def close_paper_trade(trade_id: int) -> dict:
     direction = trade.get("direction", "LONG")
     multiplier = 1 if direction == "LONG" else -1
     pnl_pct = round(multiplier * (current_price - entry) / entry * 100, 2) if entry else 0
+    quantity = float(trade.get("quantity") or 0)
+    pnl_amount = round(multiplier * (current_price - entry) * quantity, 2) if quantity else None
 
     # Update the trade — store close price in the latest available horizon column
     with get_db() as conn:
         conn.execute(
             """UPDATE paper_trades SET
                 status = 'manually_closed',
+                realized_pnl_amount = ?,
                 notes = COALESCE(notes, '') || '\nClosed at Rs.' || ? || ' on ' || date('now') || '. P&L: ' || ? || '%',
                 updated_at = datetime('now')
                WHERE id = ?""",
-            (current_price, pnl_pct, trade_id),
+            (pnl_amount, current_price, pnl_pct, trade_id),
         )
 
     # Also refresh any pending horizon prices
@@ -214,9 +242,11 @@ def refresh_paper_trade_prices(trade_id: int = None) -> dict:
     }
 
 
-def paper_trading_stats() -> dict:
+def paper_trading_stats(trading_mode: str | None = None) -> dict:
     """Aggregate stats across all paper trades."""
     trades = list_paper_trades()
+    if trading_mode:
+        trades = [trade for trade in trades if trade.get("trading_mode") == trading_mode]
 
     def compute_stats(horizon: str):
         key = f"pnl_{horizon}_pct"
@@ -382,6 +412,7 @@ def run_recommender_backtest(
     start_date: str = None,
     end_date: str = None,
     interval_days: int = 5,
+    trading_mode: str = "equity_swing",
 ) -> dict:
     """Run the recommendation engine on historical dates and measure actual outcomes.
 
@@ -423,6 +454,7 @@ def run_recommender_backtest(
                 if result:
                     result["run_id"] = run_id
                     result["trade_date"] = d.strftime("%Y-%m-%d")
+                    result["trading_mode"] = trading_mode
                     save_recommender_backtest_row(result)
                     all_results.append(result)
 

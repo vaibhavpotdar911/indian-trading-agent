@@ -203,6 +203,10 @@ function PaperTradeRow({ t, onClose, onDelete }: { t: any; onClose: (id: number)
 }
 
 export default function SimulationPage() {
+  const [tradingMode] = useState<"equity_long_term" | "equity_swing">(() => {
+    if (typeof window === "undefined") return "equity_swing";
+    return new URLSearchParams(window.location.search).get("mode") === "equity_long_term" ? "equity_long_term" : "equity_swing";
+  });
   const [tab, setTab] = useState("paper");
   const [trades, setTrades] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -220,8 +224,8 @@ export default function SimulationPage() {
     setLoading(true);
     try {
       const [tradesRes, statsRes]: any[] = await Promise.all([
-        listPaperTrades(),
-        getPaperTradingStats(),
+        listPaperTrades(undefined, tradingMode),
+        getPaperTradingStats(tradingMode),
       ]);
       setTrades(tradesRes.trades || []);
       setStats(statsRes);

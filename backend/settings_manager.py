@@ -24,6 +24,8 @@ PROVIDER_ENV_KEYS = {
     "qwen": "DASHSCOPE_API_KEY",
 }
 
+DATA_PROVIDER_ENV_KEYS = {"stoxim": "STOXIM_API_KEY"}
+
 # Provider display info
 PROVIDERS_INFO = {
     "anthropic": {
@@ -112,6 +114,27 @@ def _mask_key(key: str) -> str:
     if not key or len(key) < 15:
         return "****"
     return f"{key[:10]}...{key[-4:]}"
+
+
+def get_data_provider_keys_status() -> dict:
+    result = {}
+    for provider, env_var in DATA_PROVIDER_ENV_KEYS.items():
+        db_value = get_setting(f"data_key_{provider}")
+        env_value = os.environ.get(env_var, "")
+        active = db_value or env_value
+        result[provider] = {"provider": provider, "configured": bool(active), "source": "ui" if db_value else ("env" if env_value else None), "masked": _mask_key(active) if active else None}
+    return result
+
+
+def save_data_provider_key(provider: str, key: str):
+    env_var = DATA_PROVIDER_ENV_KEYS.get(provider)
+    if not env_var:
+        raise ValueError(f"Unsupported data provider: {provider}")
+    set_setting(f"data_key_{provider}", key if key else None)
+    if key:
+        os.environ[env_var] = key
+    else:
+        os.environ.pop(env_var, None)
 
 
 def test_api_key(provider: str, key: str | None = None) -> dict:

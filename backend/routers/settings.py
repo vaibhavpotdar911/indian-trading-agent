@@ -15,6 +15,8 @@ from backend.settings_manager import (
     save_llm_config,
     apply_llm_config_to_default,
     PROVIDERS_INFO,
+    get_data_provider_keys_status,
+    save_data_provider_key,
 )
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -29,6 +31,11 @@ class ApiKeyUpdate(BaseModel):
 class ApiKeyTest(BaseModel):
     provider: str
     key: str | None = None  # if None, tests saved key
+
+
+class DataProviderKeyUpdate(BaseModel):
+    provider: str
+    key: str
 
 
 class LLMConfigUpdate(BaseModel):
@@ -61,6 +68,23 @@ def delete_api_key(provider: str):
 def test_key(data: ApiKeyTest):
     """Test if an API key works."""
     return test_api_key(data.provider, data.key)
+
+
+@router.get("/data-provider-keys")
+def list_data_provider_keys():
+    return get_data_provider_keys_status()
+
+
+@router.put("/data-provider-keys")
+def update_data_provider_key(data: DataProviderKeyUpdate):
+    save_data_provider_key(data.provider, data.key)
+    return {"status": "saved", "provider": data.provider}
+
+
+@router.delete("/data-provider-keys/{provider}")
+def delete_data_provider_key(provider: str):
+    save_data_provider_key(provider, "")
+    return {"status": "removed", "provider": provider}
 
 
 @router.get("/llm")
@@ -169,5 +193,4 @@ def get_quota_status():
     provider = config.get("llm_provider", "google")
     model = config.get("quick_think_llm", "gemini-3.8-flash")
     return quota_tracker.get_status(provider=provider, model=model)
-
 

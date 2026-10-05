@@ -78,6 +78,94 @@ def _refresh_active_weights() -> None:
 _ACTIVE_REGIME: str | None = None
 
 
+def _fundamental_signals(ticker_obj) -> tuple[list[dict], float, dict]:
+    """Build conservative long-term signals from Yahoo fundamental fields.
+
+    Fundamental data is best-effort because vendors may omit fields. Missing
+    values never create a positive signal. The returned score is intentionally
+    modest so fundamentals confirm rather than overpower market evidence.
+    """
+    try:
+        info = ticker_obj.info or {}
+    except Exception:
+        return [], 0.0, {}
+
+    signals: list[dict] = []
+    score = 0.0
+    metrics = {
+        "pe_ratio": info.get("trailingPE"),
+        "forward_pe": info.get("forwardPE"),
+        "profit_margin": info.get("profitMargins"),
+        "roe": info.get("returnOnEquity"),
+        "debt_to_equity": info.get("debtToEquity"),
+        "revenue_growth": info.get("revenueGrowth"),
+        "earnings_growth": info.get("earningsGrowth"),
+        "free_cashflow": info.get("freeCashflow"),
+    }
+
+    def add(name: str, direction: str, value: str, weight: float):
+        nonlocal score
+        score += weight
+        signals.append({"type": name, "direction": direction, "value": value, "weight": weight})
+
+    growth = metrics["revenue_growth"]
+    if isinstance(growth, (int, float)):
+        if growth >= 0.10:
+            add("Revenue Growth", "BULLISH", f"+{growth * 100:.1f}%", 0.75)
+        elif growth <= -0.10:
+            add("Revenue Decline", "BEARISH", f"{growth * 100:.1f}%", -0.75)
+
+    margin = metrics["profit_margin"]
+    if isinstance(margin, (int, float)):
+        if margin >= 0.08:
+            add("Healthy Profit Margin", "BULLISH", f"{margin * 100:.1f}%", 0.5)
+        elif margin < 0:
+            add("Negative Profit Margin", "BEARISH", f"{margin * 100:.1f}%", -1.0)
+
+    roe = metrics["roe"]
+    if isinstance(roe, (int, float)):
+        if roe >= 0.12:
+            add("Strong ROE", "BULLISH", f"{roe * 100:.1f}%", 0.75)
+        elif roe < 0:
+            add("Negative ROE", "BEARISH", f"{roe * 100:.1f}%", -0.75)
+
+    debt = metrics["debt_to_equity"]
+    if isinstance(debt, (int, float)):
+        if debt <= 100:
+            add("Manageable Debt", "BULLISH", f"D/E {debt:.0f}", 0.5)
+        elif debt >= 200:
+            add("High Debt", "BEARISH", f"D/E {debt:.0f}", -0.75)
+
+    pe = metrics["pe_ratio"]
+    if isinstance(pe, (int, float)) and pe > 0:
+        if pe <= 35:
+            add("Reasonable Valuation", "BULLISH", f"P/E {pe:.1f}", 0.5)
+        elif pe >= 60:
+            add("Expensive Valuation", "BEARISH", f"P/E {pe:.1f}", -0.75)
+
+    cashflow = metrics["free_cashflow"]
+    if isinstance(cashflow, (int, float)):
+        if cashflow > 0:
+            add("Positive Free Cash Flow", "BULLISH", "Positive", 0.5)
+        elif cashflow < 0:
+            add("Negative Free Cash Flow", "BEARISH", "Negative", -0.5)
+
+    return signals, round(score, 2), metrics
+
+
+def _atr(hist, period: int = 14) -> float | None:
+    """Calculate simple ATR for a practical, explainable swing trade plan."""
+    if len(hist) < period + 1:
+        return None
+    previous_close = hist["Close"].shift(1)
+    true_range = np.maximum(
+        hist["High"] - hist["Low"],
+        np.maximum(abs(hist["High"] - previous_close), abs(hist["Low"] - previous_close)),
+    )
+    value = true_range.tail(period).mean()
+    return float(value) if np.isfinite(value) else None
+
+
 def _compute_rsi(closes, period=14):
     """Simple RSI calculation."""
     deltas = np.diff(closes)
@@ -90,12 +178,15 @@ def _compute_rsi(closes, period=14):
     return 100 - 100 / (1 + rs)
 
 
-def _analyze_stock(ticker: str) -> dict | None:
+def _analyze_stock(ticker: str, trading_mode: str = "equity_swing") -> dict | None:
     """Analyze a single stock and return signals + score."""
     try:
         symbol = f"{ticker}.NS"
         t = yf.Ticker(symbol)
-        hist = t.history(period="6mo")
+        # Long-term mode gets a larger sample for trend context.  The signal
+        # engine remains shared until mode-specific strategies are introduced.
+        lookback = "2y" if trading_mode == "equity_long_term" else "6mo"
+        hist = t.history(period=lookback)
         if hist.empty or len(hist) < 50:
             return None
 
@@ -217,6 +308,13 @@ def _analyze_stock(ticker: str) -> dict | None:
                 score += _ACTIVE_WEIGHTS["downtrend_strong"]
                 signals.append({"type": "Strong Downtrend", "direction": "BEARISH", "value": "Price < 50 SMA < 200 SMA", "weight": _ACTIVE_WEIGHTS["downtrend_strong"]})
 
+        mode_signals = []
+        fundamentals = {}
+        if trading_mode == "equity_long_term":
+            mode_signals, fundamental_score, fundamentals = _fundamental_signals(t)
+            score += fundamental_score
+            signals.extend(mode_signals)
+
         # === DETERMINE OVERALL RECOMMENDATION ===
         if score >= 4.0:
             direction = "STRONG BUY"
@@ -253,8 +351,30 @@ def _analyze_stock(ticker: str) -> dict | None:
 
         price_change_day = (current_close - prev_close) / prev_close * 100
 
+        trade_plan = None
+        if trading_mode == "equity_swing":
+            atr = _atr(hist)
+            if atr and atr > 0:
+                if direction in ("BUY", "STRONG BUY"):
+                    stop_loss = current_close - (1.5 * atr)
+                    target = current_close + (3.0 * atr)
+                elif direction in ("SELL", "STRONG SELL"):
+                    stop_loss = current_close + (1.5 * atr)
+                    target = current_close - (3.0 * atr)
+                else:
+                    stop_loss = target = None
+                trade_plan = {
+                    "entry": round(current_close, 2),
+                    "stop_loss": round(stop_loss, 2) if stop_loss else None,
+                    "target": round(target, 2) if target else None,
+                    "atr": round(atr, 2),
+                    "risk_reward": 2.0 if stop_loss and target else None,
+                    "holding_period": "5-15 trading days",
+                }
+
         return {
             "ticker": ticker,
+            "trading_mode": trading_mode,
             "symbol": symbol,
             "price": round(current_close, 2),
             "change_pct": round(price_change_day, 2),
@@ -268,6 +388,9 @@ def _analyze_stock(ticker: str) -> dict | None:
             "bearish_signal_count": len(bearish_signals),
             "near_support": round(recent_low, 2),
             "near_resistance": round(recent_high, 2),
+            "strategy_context": "fundamental_quality_and_valuation" if trading_mode == "equity_long_term" else "technical_swing_setup",
+            "fundamentals": fundamentals if trading_mode == "equity_long_term" else None,
+            "trade_plan": trade_plan,
         }
     except Exception as e:
         return None
@@ -433,6 +556,7 @@ def recommend(
     apply_event_filter: bool = True,
     apply_concentration_check: bool = True,
     total_capital: float = 500000,
+    trading_mode: str = "equity_swing",
 ) -> dict:
     """Run recommendation engine across a stock universe.
 
@@ -444,6 +568,10 @@ def recommend(
         apply_concentration_check: if True, penalize stocks that would over-concentrate sector
         total_capital: portfolio capital for concentration % calculation
     """
+    from backend.trading_modes import get_trading_mode
+    mode_profile = get_trading_mode(trading_mode)
+    trading_mode = mode_profile["id"]
+
     # Refresh learned weight overrides from settings before scoring any stock
     _refresh_active_weights()
 
@@ -480,7 +608,7 @@ def recommend(
             print(f"[Recommender] Concentration check failed: {e}", flush=True)
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(_analyze_stock, ticker): ticker for ticker in stocks}
+        futures = {executor.submit(_analyze_stock, ticker, trading_mode): ticker for ticker in stocks}
         for f in as_completed(futures):
             result = f.result()
             if result and (result["bullish_signal_count"] >= min_signals or result["bearish_signal_count"] >= min_signals):
@@ -527,6 +655,13 @@ def recommend(
 
     result = {
         "universe": universe,
+        "trading_mode": trading_mode,
+        "mode_profile": {
+            "label": mode_profile["label"],
+            "asset_class": mode_profile["asset_class"],
+            "time_horizon": mode_profile["time_horizon"],
+            "risk": mode_profile["risk"],
+        },
         "total_analyzed": len(stocks),
         "total_with_signals": len(all_results),
         "market_bias": market_bias,
