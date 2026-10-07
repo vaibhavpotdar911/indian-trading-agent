@@ -11,6 +11,7 @@ import sqlite3
 import os
 import json
 from datetime import datetime
+from typing import Optional
 from contextlib import contextmanager
 
 DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
@@ -254,6 +255,41 @@ def ensure_db():
                 outcome_1d TEXT,                    -- win | loss | breakeven
                 outcome_5d TEXT,
                 created_at TEXT DEFAULT (datetime('now'))
+            );
+
+            -- Automated Swing & Paper Trading Execution Logs
+            CREATE TABLE IF NOT EXISTS auto_trade_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_date TEXT NOT NULL,
+                run_datetime TEXT DEFAULT (datetime('now')),
+                trigger_type TEXT DEFAULT 'scheduled',
+                status TEXT DEFAULT 'completed',
+                summary TEXT,
+                actions_taken TEXT,
+                error_message TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+
+            -- Live & Simulated Multi-Broker Execution Orders (Kite, Kotak Neo, Upstox)
+            CREATE TABLE IF NOT EXISTS broker_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                broker TEXT NOT NULL,
+                order_id TEXT NOT NULL,
+                trading_mode TEXT DEFAULT 'equity_swing',
+                ticker TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                price REAL,
+                trigger_price REAL,
+                product TEXT DEFAULT 'CNC',
+                order_type TEXT DEFAULT 'MARKET',
+                status TEXT DEFAULT 'SUBMITTED',
+                mode TEXT DEFAULT 'paper',
+                payload TEXT,
+                response TEXT,
+                notes TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
             );
         """)
 
@@ -827,6 +863,10 @@ def add_paper_trade(data: dict) -> int:
     if triggered is not None and not isinstance(triggered, str):
         triggered = json.dumps(triggered)
 
+    selection_report = data.get("selection_report")
+    if selection_report is not None and not isinstance(selection_report, str):
+        selection_report = json.dumps(selection_report)
+
     # Tag the trade with today's market regime so we can later compute
     # conditional signal performance (some signals only work in BULL, etc.)
     regime_at_entry = data.get("regime_at_entry")
@@ -842,8 +882,8 @@ def add_paper_trade(data: dict) -> int:
             """INSERT INTO paper_trades
             (ticker, trading_mode, source, strategy, direction, signal, score, confidence,
              success_probability, triggered_signals, entry_price, stop_loss, target,
-             quantity, capital, notes, regime_at_entry)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+             quantity, capital, notes, regime_at_entry, task_id, selection_report, current_price)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 data.get("ticker"),
                 data.get("trading_mode", "equity_swing"),
@@ -862,6 +902,9 @@ def add_paper_trade(data: dict) -> int:
                 data.get("capital"),
                 data.get("notes"),
                 regime_at_entry,
+                data.get("task_id"),
+                selection_report,
+                data.get("current_price") or data.get("entry_price"),
             ),
         )
         return cursor.lastrowid
@@ -882,6 +925,14 @@ def _migrate_paper_trades_columns():
             ("confidence", "TEXT"),
             ("triggered_signals", "TEXT"),
             ("regime_at_entry", "TEXT"),  # Market regime when trade was opened
+            ("task_id", "TEXT"),
+            ("selection_report", "TEXT"),
+            ("current_price", "REAL"),
+            ("unrealized_pnl_amount", "REAL"),
+            ("unrealized_pnl_pct", "REAL"),
+            ("exit_price", "REAL"),
+            ("exit_date", "TEXT"),
+            ("exit_reason", "TEXT"),
         ]:
             if col not in existing:
                 try:
@@ -910,6 +961,118 @@ def list_paper_trades(status: str | None = None) -> list[dict]:
                     d["triggered_signals"] = json.loads(d["triggered_signals"])
                 except Exception:
                     pass
+            if d.get("selection_report"):
+                try:
+                    d["selection_report"] = json.loads(d["selection_report"])
+                except Exception:
+                    pass
+            result.append(d)
+        return result
+
+
+def get_paper_trade_by_id(trade_id: int) -> dict | None:
+    _migrate_paper_trades_columns()
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM paper_trades WHERE id = ?", (trade_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        for key in ("triggered_signals", "selection_report"):
+            if d.get(key):
+                try:
+                    d[key] = json.loads(d[key])
+                except Exception:
+                    pass
+        return d
+
+
+def update_paper_trade_exit(
+    trade_id: int,
+    exit_price: float,
+    exit_reason: str,
+    realized_pnl: float,
+    notes: str | None = None,
+):
+    """Mark a paper trade as closed with deterministic exit reason and realized P&L."""
+    _migrate_paper_trades_columns()
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE paper_trades SET
+                status = 'closed',
+                exit_price = ?,
+                exit_reason = ?,
+                exit_date = date('now'),
+                realized_pnl_amount = ?,
+                current_price = ?,
+                unrealized_pnl_amount = 0.0,
+                unrealized_pnl_pct = 0.0,
+                notes = CASE
+                    WHEN ? IS NOT NULL THEN COALESCE(notes, '') || '\n' || ?
+                    ELSE notes
+                END,
+                updated_at = datetime('now')
+               WHERE id = ?""",
+            (exit_price, exit_reason, realized_pnl, exit_price, notes, notes, trade_id),
+        )
+
+
+def update_paper_trade_live_metrics(
+    trade_id: int,
+    current_price: float,
+    unrealized_pnl: float,
+    unrealized_pnl_pct: float,
+):
+    """Update current market price and mark-to-market unrealized P&L."""
+    _migrate_paper_trades_columns()
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE paper_trades SET
+                current_price = ?,
+                unrealized_pnl_amount = ?,
+                unrealized_pnl_pct = ?,
+                updated_at = datetime('now')
+               WHERE id = ?""",
+            (current_price, unrealized_pnl, unrealized_pnl_pct, trade_id),
+        )
+
+
+def save_auto_trade_log(data: dict) -> int:
+    """Save an execution log entry for the automated trading engine."""
+    actions = data.get("actions_taken")
+    if actions is not None and not isinstance(actions, str):
+        actions = json.dumps(actions)
+    with get_db() as conn:
+        cursor = conn.execute(
+            """INSERT INTO auto_trade_logs
+            (run_date, trigger_type, status, summary, actions_taken, error_message)
+            VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                data.get("run_date") or datetime.now().strftime("%Y-%m-%d"),
+                data.get("trigger_type", "scheduled"),
+                data.get("status", "completed"),
+                data.get("summary", ""),
+                actions,
+                data.get("error_message"),
+            ),
+        )
+        return cursor.lastrowid
+
+
+def list_auto_trade_logs(limit: int = 30) -> list[dict]:
+    """List recent automated trading engine execution logs."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM auto_trade_logs ORDER BY run_datetime DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            if d.get("actions_taken"):
+                try:
+                    d["actions_taken"] = json.loads(d["actions_taken"])
+                except Exception:
+                    pass
             result.append(d)
         return result
 
@@ -917,7 +1080,6 @@ def list_paper_trades(status: str | None = None) -> list[dict]:
 def update_paper_trade_prices(trade_id: int, prices: dict):
     """Update tracked prices + P&L percentages for a paper trade."""
     with get_db() as conn:
-        # Get current trade to calculate P&L
         row = conn.execute("SELECT * FROM paper_trades WHERE id = ?", (trade_id,)).fetchone()
         if not row:
             return
@@ -1023,3 +1185,99 @@ def list_recommender_backtest_runs() -> list[dict]:
                ORDER BY MAX(created_at) DESC"""
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def add_broker_order(order_data: dict) -> int:
+    """Insert a new broker order record into broker_orders table."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """INSERT INTO broker_orders (
+                broker, order_id, trading_mode, ticker, direction, quantity,
+                price, trigger_price, product, order_type, status, mode,
+                payload, response, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                order_data.get("broker", "kite"),
+                order_data.get("order_id", ""),
+                order_data.get("trading_mode", "equity_swing"),
+                order_data.get("ticker", "").upper(),
+                order_data.get("direction", "BUY").upper(),
+                float(order_data.get("quantity") or 0),
+                float(order_data.get("price") or 0) if order_data.get("price") is not None else None,
+                float(order_data.get("trigger_price") or 0) if order_data.get("trigger_price") is not None else None,
+                order_data.get("product", "CNC"),
+                order_data.get("order_type", "MARKET"),
+                order_data.get("status", "SUBMITTED"),
+                order_data.get("mode", "paper"),
+                json.dumps(order_data.get("payload")) if isinstance(order_data.get("payload"), (dict, list)) else str(order_data.get("payload") or ""),
+                json.dumps(order_data.get("response")) if isinstance(order_data.get("response"), (dict, list)) else str(order_data.get("response") or ""),
+                order_data.get("notes", ""),
+            ),
+        )
+        return cursor.lastrowid
+
+
+def list_broker_orders(limit: int = 50, broker: Optional[str] = None) -> list[dict]:
+    """Retrieve list of broker order executions."""
+    with get_db() as conn:
+        if broker:
+            rows = conn.execute(
+                "SELECT * FROM broker_orders WHERE broker = ? ORDER BY id DESC LIMIT ?",
+                (broker.lower(), limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM broker_orders ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
+        orders = []
+        for r in rows:
+            d = dict(r)
+            if d.get("payload") and str(d["payload"]).startswith(("{", "[")):
+                try:
+                    d["payload"] = json.loads(d["payload"])
+                except Exception:
+                    pass
+            if d.get("response") and str(d["response"]).startswith(("{", "[")):
+                try:
+                    d["response"] = json.loads(d["response"])
+                except Exception:
+                    pass
+            orders.append(d)
+        return orders
+
+
+def update_broker_order_status(order_id: str, status: str, response: Optional[str] = None, notes: Optional[str] = None) -> bool:
+    """Update status and response for a broker order by order_id."""
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE broker_orders SET
+                status = ?,
+                response = COALESCE(?, response),
+                notes = COALESCE(?, notes),
+                updated_at = datetime('now')
+               WHERE order_id = ?""",
+            (status, response, notes, order_id),
+        )
+        return True
+
+
+def get_broker_order(order_id: str) -> Optional[dict]:
+    """Retrieve single broker order by order_id."""
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM broker_orders WHERE order_id = ?", (order_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        if d.get("payload") and str(d["payload"]).startswith(("{", "[")):
+            try:
+                d["payload"] = json.loads(d["payload"])
+            except Exception:
+                pass
+        if d.get("response") and str(d["response"]).startswith(("{", "[")):
+            try:
+                d["response"] = json.loads(d["response"])
+            except Exception:
+                pass
+        return d

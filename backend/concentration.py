@@ -172,6 +172,7 @@ def check_new_trade_concentration(
     ticker: str,
     proposed_position_value: Optional[float] = None,
     total_capital: float = DEFAULT_TOTAL_CAPITAL,
+    max_percent_per_sector: float = DEFAULT_MAX_PERCENT_PER_SECTOR,
 ) -> dict:
     """Check if adding a new trade would breach concentration limits.
 
@@ -179,6 +180,7 @@ def check_new_trade_concentration(
         ticker: ticker being considered
         proposed_position_value: how much capital this trade would use
         total_capital: total portfolio capital
+        max_percent_per_sector: max percentage allowed in a single sector
 
     Returns:
         {
@@ -213,9 +215,9 @@ def check_new_trade_concentration(
         score_adj -= 1.5
         would_breach = True
 
-    if new_percent > DEFAULT_MAX_PERCENT_PER_SECTOR:
+    if new_percent > max_percent_per_sector:
         warnings.append(
-            f"Would push {sector} to {new_percent:.1f}% of portfolio (max {DEFAULT_MAX_PERCENT_PER_SECTOR}%)"
+            f"Would push {sector} to {new_percent:.1f}% of portfolio (max {max_percent_per_sector}%)"
         )
         score_adj -= 1.5
         would_breach = True

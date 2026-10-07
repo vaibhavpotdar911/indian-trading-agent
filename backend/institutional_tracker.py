@@ -199,13 +199,22 @@ def get_delivery_stats(ticker: str) -> Dict[str, Any]:
         t = yf.Ticker(f"{symbol}.NS")
         hist = t.history(period="1mo")
 
-        if not hist.empty:
-            avg_vol = hist["Volume"].mean()
-            recent_vol = hist["Volume"].iloc[-1]
-            price_change = ((hist["Close"].iloc[-1] - hist["Close"].iloc[0]) / hist["Close"].iloc[0]) * 100
-
-            # Estimate delivery % based on volume concentration & price action
+        if not hist.empty and len(hist) >= 2:
+            avg_vol = float(hist["Volume"].replace([float("inf"), float("-inf")], 0).fillna(0).mean() or 0)
+            recent_vol = float(hist["Volume"].iloc[-1] or 0)
+            if not (recent_vol == recent_vol and avg_vol == avg_vol):
+                raise ValueError("invalid volume data")
+            first_close = float(hist["Close"].iloc[0] or 0)
+            last_close = float(hist["Close"].iloc[-1] or 0)
+            if not first_close:
+                raise ValueError("invalid price data")
+            price_change = ((last_close - first_close) / first_close) * 100
             vol_ratio = recent_vol / avg_vol if avg_vol else 1.0
+            if not (vol_ratio == vol_ratio and price_change == price_change):
+                raise ValueError("invalid derived stats")
+            # Estimate delivery % based on volume concentration & price action
+            vol_ratio = max(0.0, min(vol_ratio, 10.0))
+            price_change = max(-100.0, min(price_change, 100.0))
             base_del_pct = min(85.0, max(25.0, 45.0 + (vol_ratio - 1.0) * 15.0))
 
             if vol_ratio > 1.3 and price_change > 1.0:

@@ -48,7 +48,7 @@ export function RiskMonitor() {
           <Metric label="Open positions" value={`${summary.open_positions}/${summary.profile.max_open_positions}`} />
           <Metric label="Open risk heat" value={`₹${Number(summary.open_risk || 0).toLocaleString()}`} detail={`${heatPct}% of capital`} />
           <Metric label="Realized today" value={`₹${Number(summary.realized_today || 0).toLocaleString()}`} detail={`${dailyPct}% of loss limit`} negative={summary.realized_today < 0} />
-          <Metric label="Sector status" value={concentration?.risk_level || "UNKNOWN"} detail={`${concentration?.total_positions || 0} positions`} negative={concentration?.risk_level === "HIGH"} />
+          <Metric label="Broker exposure" value={`₹${Number(summary.broker_exposure || 0).toLocaleString()}`} detail={`${summary.broker_positions || 0} synced positions · ${concentration?.risk_level || "UNKNOWN"} sector`} negative={concentration?.risk_level === "HIGH"} />
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-muted-foreground">
           <span className="flex items-center gap-1">{highRisk ? <AlertTriangle className="h-4 w-4 text-red-600" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />} {highRisk ? "Review risk before opening new trades." : "No immediate risk threshold breached."}</span>

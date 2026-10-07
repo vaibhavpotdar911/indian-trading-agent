@@ -62,10 +62,20 @@ def run_fundamental_backtest(prices: pd.DataFrame, fundamentals: pd.DataFrame, c
     if prices.empty or fundamentals.empty:
         raise ValueError("Price and fundamental observations are required")
     fundamentals = fundamentals.copy()
-    if "date" not in fundamentals.columns:
+    if "date" not in fundamentals.columns and "filing_date" not in fundamentals.columns:
         raise ValueError("Fundamentals require a date column")
-    fundamentals["date"] = pd.to_datetime(fundamentals["date"]).dt.tz_localize(None)
-    fundamentals = fundamentals.sort_values("date")
+    if "filing_date" in fundamentals.columns:
+        _dates = pd.to_datetime(fundamentals["filing_date"], errors="coerce")
+    else:
+        _dates = pd.to_datetime(fundamentals["date"], errors="coerce")
+    try:
+        if getattr(_dates.dt, "tz", None) is not None:
+            _dates = _dates.dt.tz_localize(None)
+    except Exception:
+        _dates = pd.to_datetime(_dates.astype(str).str[:10], errors="coerce")
+    fundamentals["available_date"] = _dates
+    fundamentals = fundamentals.dropna(subset=["available_date"])
+    fundamentals = fundamentals.sort_values("available_date")
     capital = float(cfg.initial_capital)
     position = 0
     entry = 0.0
@@ -74,9 +84,15 @@ def run_fundamental_backtest(prices: pd.DataFrame, fundamentals: pd.DataFrame, c
     equity: list[dict] = []
     last_rebalance = -cfg.rebalance_days
     for index in range(len(prices) - 1):
-        day = pd.Timestamp(prices.index[index]).tz_localize(None) if pd.Timestamp(prices.index[index]).tzinfo else pd.Timestamp(prices.index[index])
+        _ts = prices.index[index]
+        try:
+            day = pd.Timestamp(_ts)
+            if getattr(day, "tzinfo", None) is not None:
+                day = day.tz_localize(None)
+        except Exception:
+            day = pd.Timestamp(str(_ts)[:10])
         if index - last_rebalance >= cfg.rebalance_days:
-            available = fundamentals[fundamentals["date"] <= day - pd.Timedelta(days=cfg.reporting_lag_days)]
+            available = fundamentals[fundamentals["available_date"] <= day]
             if not available.empty:
                 snapshot = available.iloc[-1]
                 score, reasons = _score(snapshot)

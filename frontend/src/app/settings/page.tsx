@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getConfig } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LLMSettings } from "@/components/settings/LLMSettings";
@@ -11,6 +12,8 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { statusColors } from "@/lib/status-colors";
 import { RiskSettings } from "@/components/settings/RiskSettings";
 import { DataProviderSettings } from "@/components/settings/DataProviderSettings";
+import { Route, Building2, ExternalLink, ArrowRight, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<Record<string, any> | null>(null);
@@ -84,6 +87,63 @@ export default function SettingsPage() {
 
       <RiskSettings />
       <DataProviderSettings />
+
+      {/* Multi-Broker Live Execution & Strategy Routing Overview */}
+      <Card className="border border-primary/40 bg-card/70 backdrop-blur-md">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between flex-wrap gap-2">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Route className="h-5 w-5 text-primary" />
+              Multi-Broker Live Execution Engine
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Automated routing of trade kinds across Zerodha Kite, Kotak Neo, and Upstox with live &amp; paper safety modes.
+            </CardDescription>
+          </div>
+          <Link href="/simulation">
+            <Button size="sm" className="text-xs flex items-center gap-1.5">
+              Manage Routing &amp; Execute Trades
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <span className="font-bold text-xs text-amber-400 block mb-1">Zerodha Kite</span>
+              <p className="text-[11px] text-muted-foreground mb-1.5">
+                Default for <strong>Equity Long-term (CNC)</strong>. 0% delivery brokerage and reliable portfolio sync.
+              </p>
+              <span className="text-[10px] text-muted-foreground block font-mono">Product: CNC · Developers portal</span>
+            </div>
+
+            <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/5">
+              <span className="font-bold text-xs text-rose-400 block mb-1">Kotak Neo</span>
+              <p className="text-[11px] text-muted-foreground mb-1.5">
+                Default for <strong>Intraday (MIS) &amp; NSE Futures (NRML)</strong>. Zero intraday brokerage plans and low derivatives latency.
+              </p>
+              <span className="text-[10px] text-muted-foreground block font-mono">Product: MIS / NRML · Trade API</span>
+            </div>
+
+            <div className="p-3 rounded-lg border border-purple-500/30 bg-purple-500/5">
+              <span className="font-bold text-xs text-purple-400 block mb-1">Upstox API v2</span>
+              <p className="text-[11px] text-muted-foreground mb-1.5">
+                Default for <strong>Equity Swing Trading (CNC)</strong>. OAuth 2.0 authentication and rapid order confirmation.
+              </p>
+              <span className="text-[10px] text-muted-foreground block font-mono">Product: Delivery (D) · v2 API</span>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-lg border border-border/40 bg-background/50 flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>
+                All live and simulated orders enforce strict <strong>5% risk per trade budgeting</strong>, pre-trade stop-loss validation, and Indian market hours (09:15 - 15:30 IST).
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div>
         <h2 className="text-lg font-semibold">System Configuration</h2>

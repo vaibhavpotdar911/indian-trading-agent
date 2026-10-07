@@ -6,7 +6,7 @@ this layer decides whether its size and loss are acceptable.
 
 from datetime import date
 
-from backend.db import get_setting, set_setting, list_paper_trades
+from backend.db import get_setting, set_setting, list_paper_trades, list_positions
 from backend.trading_modes import get_trading_mode
 
 
@@ -77,11 +77,21 @@ def _portfolio_metrics(trading_mode: str) -> dict:
         realized_today = sum(
             float(trade.get("realized_pnl_amount") or 0)
             for trade in trades
-            if trade.get("entry_date") == today
+            if str(trade.get("updated_at") or trade.get("entry_date") or "")[:10] == today
         )
-        return {"open_risk": round(open_risk, 2), "realized_today": round(realized_today, 2)}
+        broker_positions = list_positions()
+        broker_exposure = sum(float(row.get("current_value") or 0) for row in broker_positions)
+        broker_unrealized = sum(float(row.get("pnl") or 0) for row in broker_positions)
+        broker_count = sum(1 for row in broker_positions if float(row.get("quantity") or 0) > 0)
+        return {
+            "open_risk": round(open_risk, 2),
+            "realized_today": round(realized_today, 2),
+            "broker_exposure": round(broker_exposure, 2),
+            "broker_positions": broker_count,
+            "broker_unrealized": round(broker_unrealized, 2),
+        }
     except Exception:
-        return {"open_risk": 0.0, "realized_today": 0.0}
+        return {"open_risk": 0.0, "realized_today": 0.0, "broker_exposure": 0.0, "broker_positions": 0, "broker_unrealized": 0.0}
 
 
 def set_trading_lock(locked: bool) -> dict:
@@ -103,6 +113,9 @@ def get_portfolio_risk_summary(trading_mode: str = "equity_swing") -> dict:
         "daily_loss_limit": round(daily_limit, 2),
         "daily_loss_used_pct": round(max(0, -metrics["realized_today"]) / daily_limit * 100, 2) if daily_limit else 0,
         "open_positions": _open_trade_count(profile["trading_mode"]),
+        "broker_exposure": metrics.get("broker_exposure", 0),
+        "broker_positions": metrics.get("broker_positions", 0),
+        "broker_unrealized": metrics.get("broker_unrealized", 0),
     }
 
 
@@ -144,7 +157,8 @@ def check_trade(
     else:
         risk_per_unit = 0.0
 
-    position_value = entry * qty if qty > 0 else 0.0
+    margin_rate = 0.22 if (profile.get("asset_class") == "futures" or trading_mode == "futures") else 1.0
+    position_value = entry * qty * margin_rate if qty > 0 else 0.0
     risk_amount = risk_per_unit * qty if qty > 0 else 0.0
     risk_pct = risk_amount / profile["capital"] * 100 if profile["capital"] else 0.0
     position_pct = position_value / profile["capital"] * 100 if profile["capital"] else 0.0
@@ -170,8 +184,12 @@ def check_trade(
     if ticker:
         try:
             from backend.concentration import check_new_trade_concentration
+            sector_limit = 45.0 if (profile.get("asset_class") == "futures" or trading_mode == "futures") else 30.0
             concentration = check_new_trade_concentration(
-                ticker, proposed_position_value=position_value or None, total_capital=profile["capital"]
+                ticker,
+                proposed_position_value=position_value or None,
+                total_capital=profile["capital"],
+                max_percent_per_sector=sector_limit,
             )
             if concentration.get("would_breach"):
                 errors.extend(concentration.get("warnings", []))
@@ -181,7 +199,9 @@ def check_trade(
             warnings.append("Sector concentration could not be checked.")
 
     open_count = _open_trade_count(profile["trading_mode"])
-    if open_count >= profile["max_open_positions"]:
+    broker_position_count = portfolio.get("broker_positions", 0)
+    effective_open_count = open_count + broker_position_count
+    if effective_open_count >= profile["max_open_positions"]:
         errors.append(
             f"Maximum open positions reached ({profile['max_open_positions']})."
         )
@@ -198,7 +218,11 @@ def check_trade(
             "risk_amount": round(risk_amount, 2),
             "risk_pct": round(risk_pct, 3),
             "position_pct": round(position_pct, 3),
-            "open_positions": open_count,
+            "open_positions": effective_open_count,
+            "paper_open_positions": open_count,
+            "broker_positions": broker_position_count,
+            "broker_exposure": portfolio.get("broker_exposure", 0),
+            "broker_unrealized": portfolio.get("broker_unrealized", 0),
             "open_risk": portfolio["open_risk"],
             "realized_today": portfolio["realized_today"],
             "daily_loss_limit": round(daily_loss_limit, 2),

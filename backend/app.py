@@ -12,10 +12,31 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from backend.db import ensure_db
+import asyncio
+from backend.db import ensure_db, get_setting
 from backend.auth import AuthMiddleware, allowed_origins
-from backend.routers import market_data, analysis, watchlist, backtest, strategies, scanner, performance, recommender, settings as settings_router, news as news_router, simulation as simulation_router, insights as insights_router, fii_dii as fii_dii_router, calendar as calendar_router, concentration as concentration_router, daily_verdict as daily_verdict_router, signal_performance as signal_performance_router, verdict_calibration as verdict_calibration_router, regime as regime_router, confidence_calibration as confidence_calibration_router, shadow_trades as shadow_trades_router, memory as memory_router, auth as auth_router, kite as kite_router, upstox as upstox_router, kotak_neo as kotak_neo_router, equity_portfolio as equity_portfolio_router, positions as positions_router, telegram as telegram_router, institutional as institutional_router, trading_modes as trading_modes_router, risk as risk_router, realistic_backtest as realistic_backtest_router, kotak_feed as kotak_feed_router, fundamental_backtest as fundamental_backtest_router
+from backend.routers import market_data, analysis, watchlist, backtest, strategies, scanner, performance, recommender, settings as settings_router, news as news_router, simulation as simulation_router, insights as insights_router, fii_dii as fii_dii_router, calendar as calendar_router, concentration as concentration_router, daily_verdict as daily_verdict_router, signal_performance as signal_performance_router, verdict_calibration as verdict_calibration_router, regime as regime_router, confidence_calibration as confidence_calibration_router, shadow_trades as shadow_trades_router, memory as memory_router, auth as auth_router, kite as kite_router, upstox as upstox_router, kotak_neo as kotak_neo_router, equity_portfolio as equity_portfolio_router, positions as positions_router, telegram as telegram_router, institutional as institutional_router, trading_modes as trading_modes_router, risk as risk_router, realistic_backtest as realistic_backtest_router, kotak_feed as kotak_feed_router, fundamental_backtest as fundamental_backtest_router, auto_trade as auto_trade_router
 from backend.settings_manager import load_api_keys_into_env, apply_llm_config_to_default
+
+
+async def _auto_trade_background_loop():
+    """Background runner that periodically updates active positions and executes auto-trades when enabled during market hours."""
+    from backend.auto_trader import run_auto_trade_cycle
+    from tradingagents.utils.market_calendar import is_market_open
+    while True:
+        try:
+            await asyncio.sleep(1800)  # Check every 30 minutes
+            if (get_setting("auto_trade_enabled") or "0") == "1":
+                if is_market_open():
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, run_auto_trade_cycle, "scheduled")
+                else:
+                    print("[AutoTradeBackground] Markets currently closed. Scheduled cycle skipped.", flush=True)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[AutoTradeBackground] Error: {e}", flush=True)
+            await asyncio.sleep(60)
 
 
 @asynccontextmanager
@@ -25,7 +46,11 @@ async def lifespan(app: FastAPI):
     load_api_keys_into_env()
     # Apply saved LLM config to DEFAULT_CONFIG
     apply_llm_config_to_default()
-    yield
+    bg_task = asyncio.create_task(_auto_trade_background_loop())
+    try:
+        yield
+    finally:
+        bg_task.cancel()
 
 
 app = FastAPI(
@@ -83,8 +108,11 @@ app.include_router(risk_router.router)
 app.include_router(realistic_backtest_router.router)
 app.include_router(kotak_feed_router.router)
 app.include_router(fundamental_backtest_router.router)
+app.include_router(auto_trade_router.router)
 from backend.routers import brokers as brokers_router
 app.include_router(brokers_router.router)
+from backend.routers import execution as execution_router
+app.include_router(execution_router.router)
 
 
 @app.get("/api/health")

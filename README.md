@@ -704,6 +704,8 @@ Apache License 2.0 — see [LICENSE](./LICENSE) file.
 
 This project builds on the Apache 2.0-licensed [TradingAgents](https://github.com/TauricResearch/TradingAgents) framework. See [NOTICE](./NOTICE) for attribution details.
 
+See [ROADMAP.md](./ROADMAP.md) for Phase 1 status and planned future development.
+
 ### Data Sources & Terms
 
 The code is Apache-2.0, but the **data** it accesses at runtime carries each source's own terms — review these before any **commercial** use:

@@ -70,6 +70,7 @@ def fetch_stoxim_snapshots(ticker: str) -> list[dict[str, Any]]:
         ratio = ratios_by_period.get(str(period), {})
         snapshots.append({
             "date": period,
+            "filing_date": row.get("filing_date") or row.get("filingDate") or row.get("published_at") or row.get("publishedAt"),
             "revenue_growth": row.get("revenue_growth") or row.get("revenueGrowth"),
             "operating_margin": row.get("operating_margin") or row.get("operatingMargin"),
             "roe": ratio.get("roe") or row.get("roe"),

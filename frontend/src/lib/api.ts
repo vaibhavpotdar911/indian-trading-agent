@@ -416,6 +416,97 @@ export const getRecommenderBacktestResult = (runId: string) =>
 export const listRecommenderBacktests = () =>
   fetchAPI(`/api/simulation/recommender-backtest-history`);
 
+// Automated Swing & Futures Trader
+export const getAutoTradeStatus = (tradingMode = "equity_swing") =>
+  fetchAPI<any>(`/api/auto-trade/status?trading_mode=${tradingMode}`);
+
+export const getAutoTradeSettings = (tradingMode = "equity_swing") =>
+  fetchAPI<any>(`/api/auto-trade/settings?trading_mode=${tradingMode}`);
+
+export const updateAutoTradeSettings = (settings: {
+  enabled?: boolean;
+  capital?: number;
+  risk_per_trade_pct?: number;
+  max_position_pct?: number;
+  max_open_positions?: number;
+  universe?: string;
+  run_ai_validation?: boolean;
+  min_score?: number;
+}, tradingMode = "equity_swing") =>
+  fetchAPI<any>(`/api/auto-trade/settings?trading_mode=${tradingMode}`, { method: "POST", body: JSON.stringify(settings) });
+
+export const runAutoTradeCycle = (tradingMode = "equity_swing") =>
+  fetchAPI<any>(`/api/auto-trade/run?trading_mode=${tradingMode}`, { method: "POST" });
+
+export const monitorExitsNow = (tradingMode = "equity_swing") =>
+  fetchAPI<any>(`/api/auto-trade/monitor-exits?trading_mode=${tradingMode}`, { method: "POST" });
+
+export const getFuturesCandidates = (universe = "nifty100", minScore = 1.5, limit = 6) =>
+  fetchAPI<any>(`/api/auto-trade/futures/candidates?universe=${universe}&min_score=${minScore}&limit=${limit}`);
+
+export const getAutoTradeLogs = (limit = 30) =>
+  fetchAPI<any>(`/api/auto-trade/logs?limit=${limit}`);
+
+export const getTradeSelectionReport = (tradeId: number) =>
+  fetchAPI<any>(`/api/auto-trade/trade/${tradeId}/report`);
+
+// Live Execution Engine & Multi-Broker Routing (Kite, Kotak Neo, Upstox)
+export const getExecutionRoutingRules = () =>
+  fetchAPI<{ rules: Record<string, string>; supported_brokers: string[]; supported_strategies: string[] }>(`/api/execution/routing-rules`);
+
+export const updateExecutionRoutingRules = (rules: Record<string, string>) =>
+  fetchAPI<{ ok: boolean; rules: Record<string, string> }>(`/api/execution/routing-rules`, {
+    method: "POST",
+    body: JSON.stringify({ rules }),
+  });
+
+export const getExecutionConfig = () =>
+  fetchAPI<{ mode: string; is_live: boolean }>(`/api/execution/config`);
+
+export const updateExecutionConfig = (mode: "live" | "paper") =>
+  fetchAPI<{ ok: boolean; mode: string; is_live: boolean }>(`/api/execution/config`, {
+    method: "POST",
+    body: JSON.stringify({ mode }),
+  });
+
+export const getExecutionBrokersStatus = () =>
+  fetchAPI<{
+    execution_mode: string;
+    routing_rules: Record<string, string>;
+    brokers: Record<string, {
+      name: string;
+      configured: boolean;
+      connected_today: boolean;
+      assigned_strategies: string[];
+    }>;
+  }>(`/api/execution/brokers`);
+
+export const placeExecutionOrder = (data: {
+  ticker: string;
+  direction: "BUY" | "SELL";
+  quantity: number;
+  trading_mode?: string;
+  price?: number;
+  trigger_price?: number;
+  order_type?: string;
+  product?: string;
+  requested_broker?: string;
+  notes?: string;
+  force_mode?: "live" | "paper";
+}) =>
+  fetchAPI<any>(`/api/execution/order`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+export const getExecutionOrders = (limit = 50, broker?: string) => {
+  const query = broker ? `?limit=${limit}&broker=${broker}` : `?limit=${limit}`;
+  return fetchAPI<{ orders: any[] }>(`/api/execution/orders${query}`);
+};
+
+export const getExecutionOrderDetails = (orderId: string) =>
+  fetchAPI<any>(`/api/execution/order/${orderId}`);
+
 // Recommendations
 export const getRecommendations = (universe = "nifty100", minSignals = 2, tradingMode = "equity_swing") =>
   fetchAPI(`/api/recommend/?universe=${universe}&min_signals=${minSignals}&trading_mode=${tradingMode}`);

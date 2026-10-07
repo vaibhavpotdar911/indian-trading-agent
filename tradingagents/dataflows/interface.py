@@ -34,6 +34,38 @@ from .nse_data import (
 # Configuration and routing logic
 from .config import get_config
 
+
+def get_kotak_stock_data(symbol: str, start_date: str, end_date: str) -> str:
+    """Return Kotak daily candles in the same CSV contract as yfinance."""
+    from backend.brokers.kotak_neo import fetch_historical_ohlcv
+    rows = fetch_historical_ohlcv(symbol, "NSE", "D", start_date, end_date)
+    if not rows:
+        raise RuntimeError(f"Kotak returned no historical data for {symbol}")
+    frame = __import__("pandas").DataFrame(rows).rename(columns={"time": "Date"})
+    frame["Date"] = frame["Date"].astype(str).str[:10]
+    return f"# Data source: Kotak Neo SDK 3.x\n{frame.to_csv(index=False)}"
+
+
+def get_kotak_indicators(symbol: str, indicator: str, curr_date: str, look_back_days: int) -> str:
+    """Calculate technical indicators from Kotak candles, not Yahoo data."""
+    from datetime import datetime, timedelta
+    from stockstats import wrap
+    from backend.brokers.kotak_neo import fetch_historical_ohlcv
+    end = datetime.strptime(curr_date, "%Y-%m-%d").date()
+    rows = fetch_historical_ohlcv(symbol, "NSE", "D", (end - timedelta(days=look_back_days + 60)).isoformat(), curr_date)
+    if not rows:
+        raise RuntimeError(f"Kotak returned no indicator data for {symbol}")
+    frame = __import__("pandas").DataFrame(rows)
+    frame = frame.rename(columns={"time": "date"})
+    frame["date"] = frame["date"].astype(str).str[:10]
+    stats = wrap(frame)
+    stats[indicator]
+    valid = stats[stats["date"] <= curr_date]
+    if valid.empty:
+        raise RuntimeError(f"Kotak has no indicator value for {symbol} on {curr_date}")
+    value = valid.iloc[-1][indicator]
+    return "N/A" if __import__("pandas").isna(value) else str(value)
+
 # Tools organized by category
 TOOLS_CATEGORIES = {
     "core_stock_apis": {
@@ -78,6 +110,7 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "kotak_neo",
     "nse",
 ]
 
@@ -87,11 +120,13 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "kotak_neo": get_kotak_stock_data,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "kotak_neo": get_kotak_indicators,
     },
     # fundamental_data
     "get_fundamentals": {
@@ -154,8 +189,19 @@ def get_vendor(category: str, method: str = None) -> str:
         if method in tool_vendors:
             return tool_vendors[method]
 
-    # Fall back to category-level configuration
-    return config.get("data_vendors", {}).get(category, "default")
+    # The broker market-data selector is authoritative for live/technical
+    # equity data. This connects Kotak's SDK feed to the same analysis tools
+    # used by the agents, while preserving configured vendor overrides.
+    configured = config.get("data_vendors", {}).get(category, "default")
+    if category in ("core_stock_apis", "technical_indicators"):
+        try:
+            from backend.market_data_provider import resolve_active_vendor
+            vendor, _, _ = resolve_active_vendor()
+            if vendor == "kotak_neo":
+                return "kotak_neo"
+        except Exception:
+            pass
+    return configured
 
 def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""

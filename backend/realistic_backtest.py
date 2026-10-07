@@ -24,6 +24,11 @@ class BacktestConfig:
     target_atr_multiple: float = 3.0
     max_hold_days: int = 10
     walk_forward_test_pct: float = 30.0
+    min_average_volume: int = 0
+    max_participation_pct: float = 100.0
+    max_intraday_range_pct: float = 25.0
+    include_dividends: bool = True
+    include_splits: bool = True
 
 
 def _prepare(data: pd.DataFrame) -> pd.DataFrame:
@@ -35,6 +40,10 @@ def _prepare(data: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing OHLCV columns: {', '.join(sorted(missing))}")
     frame = frame.sort_index().copy()
+    frame["Volume"] = frame["Volume"].fillna(0)
+    frame["dividend"] = frame.get("Dividends", 0)
+    frame["split"] = frame.get("Stock Splits", 0)
+    frame["avg_volume20"] = frame["Volume"].rolling(20).mean().fillna(frame["Volume"])
     frame["sma20"] = frame["Close"].rolling(20).mean()
     frame["sma50"] = frame["Close"].rolling(50).mean()
     frame["prior_high20"] = frame["High"].rolling(20).max().shift(1)
@@ -76,6 +85,15 @@ def run_realistic_backtest(data: pd.DataFrame, config: BacktestConfig | None = N
         risk_budget = capital * cfg.risk_per_trade_pct / 100
         max_value = capital * cfg.max_position_pct / 100
         quantity = math.floor(min(risk_budget / risk_per_share, max_value / entry)) if risk_per_share and entry > 0 else 0
+        if float(signal_row["avg_volume20"]) < cfg.min_average_volume:
+            i += 1
+            continue
+        intraday_range = (float(signal_row["High"]) - float(signal_row["Low"])) / float(signal_row["Close"]) * 100 if float(signal_row["Close"]) else 0
+        if intraday_range > cfg.max_intraday_range_pct:
+            i += 1
+            continue
+        if float(signal_row["Volume"] or 0) and cfg.max_participation_pct < 100:
+            quantity = min(quantity, math.floor(float(signal_row["Volume"]) * cfg.max_participation_pct / 100))
         if quantity <= 0:
             i += 1
             continue
@@ -109,9 +127,19 @@ def run_realistic_backtest(data: pd.DataFrame, config: BacktestConfig | None = N
             raw_exit = float(frame.iloc[exit_index]["Close"])
             exit_price = raw_exit * (1 - slip if side == "LONG" else 1 + slip)
 
+        held = frame.iloc[i + 1 : exit_index + 1]
+        dividend_pnl = float(held["dividend"].sum() * quantity) if cfg.include_dividends and side == "LONG" else 0.0
+        try:
+            split_factor = float(pd.to_numeric(held["split"], errors="coerce").fillna(0).replace(0, 1).prod())
+        except Exception:
+            split_factor = 1.0
+        if split_factor != 1:
+            quantity = math.floor(quantity * split_factor)
+            entry = entry / split_factor
+            exit_price = exit_price / split_factor
         gross = (exit_price - entry) * quantity if side == "LONG" else (entry - exit_price) * quantity
         costs = (entry * quantity + exit_price * quantity) * cfg.round_trip_cost_bps / 10_000
-        pnl = gross - costs
+        pnl = gross - costs + dividend_pnl
         capital += pnl
         peak = max(peak, capital)
         drawdown = (peak - capital) / peak * 100 if peak else 0
@@ -126,6 +154,8 @@ def run_realistic_backtest(data: pd.DataFrame, config: BacktestConfig | None = N
             "quantity": quantity,
             "gross_pnl": round(gross, 2),
             "costs": round(costs, 2),
+            "dividend_pnl": round(dividend_pnl, 2),
+            "split_factor": split_factor,
             "pnl": round(pnl, 2),
             "pnl_pct_on_capital": round(pnl / (capital - pnl) * 100, 3),
             "exit_reason": exit_reason,

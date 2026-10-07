@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AutoTraderPanel } from "@/components/dashboard/AutoTraderPanel";
+import { BrokerRoutingManager } from "@/components/dashboard/BrokerRoutingManager";
 import { HelpSection } from "@/components/HelpSection";
 import {
   FlaskConical,
@@ -36,6 +38,7 @@ import {
   Radar,
   Target,
   Brain,
+  Route,
 } from "lucide-react";
 import { toast } from "sonner";
 import { statusColors, directionBg } from "@/lib/status-colors";
@@ -126,8 +129,19 @@ function PaperTradeRow({ t, onClose, onDelete }: { t: any; onClose: (id: number)
         <TableCell className="text-right text-sm"><PnLCell value={t.pnl_5d_pct} /></TableCell>
         <TableCell className="text-right text-sm"><PnLCell value={t.pnl_10d_pct} /></TableCell>
         <TableCell>
-          <Badge variant="outline" className="text-xs">
-            {t.status}
+          <Badge
+            variant="outline"
+            className={`text-xs ${
+              t.exit_reason === "stop_loss_hit"
+                ? "border-rose-500/40 text-rose-400 bg-rose-500/10"
+                : t.exit_reason === "target_hit"
+                ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                : t.exit_reason === "horizon_expired"
+                ? "border-amber-500/40 text-amber-400 bg-amber-500/10"
+                : ""
+            }`}
+          >
+            {t.exit_reason ? t.exit_reason.replace(/_/g, " ") : t.status}
           </Badge>
         </TableCell>
         <TableCell>
@@ -192,6 +206,24 @@ function PaperTradeRow({ t, onClose, onDelete }: { t: any; onClose: (id: number)
                 <div>
                   <span className="text-muted-foreground">Notes: </span>
                   <span>{t.notes}</span>
+                </div>
+              )}
+              {t.selection_report && (
+                <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 mt-2">
+                  <span className="text-xs font-semibold text-emerald-400 block mb-1">
+                    Automated AI Selection Rationale:
+                  </span>
+                  <p className="text-xs text-foreground/90 mb-2">
+                    {t.selection_report.why_picked || JSON.stringify(t.selection_report)}
+                  </p>
+                  {t.selection_report.trade_parameters && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-muted-foreground pt-1 border-t border-emerald-500/10">
+                      <span>SL: ₹{t.selection_report.trade_parameters.stop_loss}</span>
+                      <span>Target: ₹{t.selection_report.trade_parameters.target}</span>
+                      <span>Risk: ₹{t.selection_report.trade_parameters.actual_risk_amount} ({t.selection_report.trade_parameters.actual_risk_pct}%)</span>
+                      <span>Qty: {t.selection_report.trade_parameters.quantity} shares</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -353,9 +385,15 @@ export default function SimulationPage() {
         </p>
       </div>
 
+      <AutoTraderPanel />
+
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="paper">Paper Trades ({trades.length})</TabsTrigger>
+          <TabsTrigger value="routing" className="flex items-center gap-1.5">
+            <Route className="h-3.5 w-3.5 text-primary" />
+            Live & Multi-Broker Routing
+          </TabsTrigger>
           <TabsTrigger value="historical">Historical Backtest</TabsTrigger>
         </TabsList>
 
@@ -724,6 +762,11 @@ export default function SimulationPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* === LIVE EXECUTION & MULTI-BROKER ROUTING === */}
+        <TabsContent value="routing" className="space-y-4">
+          <BrokerRoutingManager />
         </TabsContent>
       </Tabs>
 
