@@ -44,6 +44,17 @@ class LLMConfigUpdate(BaseModel):
     quick_think_llm: str | None = None
 
 
+class BaseUrlUpdate(BaseModel):
+    provider: str
+    base_url: str
+
+
+class DiscoverModelsRequest(BaseModel):
+    provider: str = "custom_router"
+    base_url: str | None = None
+    api_key: str | None = None
+
+
 @router.get("/api-keys")
 def list_api_keys():
     """Get status of all API keys (masked)."""
@@ -109,8 +120,13 @@ def update_llm_settings(data: LLMConfigUpdate):
 def list_providers():
     """List available LLM providers with their active supported models."""
     from backend.db import get_setting
-    from backend.settings_manager import OBSOLETE_MODELS
+    from backend.settings_manager import OBSOLETE_MODELS, get_provider_base_url
     info = json.loads(json.dumps(PROVIDERS_INFO))
+
+    # Add custom Base URL if supported
+    for p_id in info:
+        if info[p_id].get("supports_custom_url"):
+            info[p_id]["base_url"] = get_provider_base_url(p_id)
 
     api_key_google = get_setting("api_key_google") or os.environ.get("GOOGLE_API_KEY")
     if api_key_google:
@@ -130,6 +146,53 @@ def list_providers():
         info[p_id]["models_deep"] = [m for m in info[p_id].get("models_deep", []) if m not in OBSOLETE_MODELS]
 
     return info
+
+
+@router.get("/router/base-url/{provider}")
+def get_base_url(provider: str):
+    """Get the current base URL for a provider."""
+    from backend.settings_manager import get_provider_base_url
+    return {"provider": provider, "base_url": get_provider_base_url(provider)}
+
+
+@router.put("/router/base-url")
+def update_base_url(data: BaseUrlUpdate):
+    """Save a custom base URL for a provider."""
+    from backend.settings_manager import save_provider_base_url, get_provider_base_url
+    save_provider_base_url(data.provider, data.base_url)
+    return {"status": "saved", "provider": data.provider, "base_url": get_provider_base_url(data.provider)}
+
+
+@router.post("/router/discover-models")
+def discover_router_models(data: DiscoverModelsRequest):
+    """Query {base_url}/models to list active models from the router."""
+    from backend.settings_manager import get_provider_base_url, PROVIDER_ENV_KEYS
+    from backend.db import get_setting
+    from openai import OpenAI
+
+    base_url = (data.base_url or "").strip().rstrip("/") or get_provider_base_url(data.provider)
+    key = data.api_key
+    if not key:
+        key = get_setting(f"api_key_{data.provider}") or os.environ.get(PROVIDER_ENV_KEYS.get(data.provider, ""), "")
+    if not key:
+        key = "token"
+
+    try:
+        client = OpenAI(
+            api_key=key,
+            base_url=base_url,
+            timeout=8.0,
+            default_headers={
+                "HTTP-Referer": "https://github.com/vaibhavpotdar911/indian-trading-agent",
+                "X-Title": "Indian Trading Agent",
+            },
+        )
+        models_page = client.models.list()
+        models = [m.id for m in getattr(models_page, "data", []) if getattr(m, "id", None)]
+        return {"reachable": True, "base_url": base_url, "models": models, "count": len(models)}
+    except Exception as e:
+        logger.warning("Model discovery failed for %s at %s: %s", data.provider, base_url, e)
+        return {"reachable": False, "base_url": base_url, "models": [], "error": str(e)}
 
 
 def _ollama_host() -> str:
@@ -186,11 +249,11 @@ def list_google_models():
 
 @router.get("/quota")
 def get_quota_status():
-    """Get live Gemini / LLM quota and rate limit status."""
+    """Get live LLM quota and rate limit status adapted to active provider."""
     from backend.quota_tracker import quota_tracker
     from backend.settings_manager import get_llm_config
     config = get_llm_config()
-    provider = config.get("llm_provider", "google")
-    model = config.get("quick_think_llm", "gemini-3.8-flash")
+    provider = config.get("llm_provider", "custom_router")
+    model = config.get("quick_think_llm", "")
     return quota_tracker.get_status(provider=provider, model=model)
 

@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Mapping of provider → environment variable name used by langchain clients
 PROVIDER_ENV_KEYS = {
+    "custom_router": "CUSTOM_ROUTER_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
     "google": "GOOGLE_API_KEY",
@@ -28,6 +29,29 @@ DATA_PROVIDER_ENV_KEYS = {"stoxim": "STOXIM_API_KEY"}
 
 # Provider display info
 PROVIDERS_INFO = {
+    "custom_router": {
+        "name": "Custom Router / Endpoint",
+        "key_format": "sk-... or unified Bearer token",
+        "supports_custom_url": True,
+        "default_base_url": "https://freellmapi.com/v1",
+        "signup_url": "https://freellmapi.com",
+        "type_badge": "Open-Source Router",
+        "cost_tier": "Configurable Endpoint",
+        "tool_support": "OpenAI-Compatible Tool Calling",
+        "note": "Connect any open-source router or custom endpoint (FreeLLMAPI, OpenRouter, UnoRouter, vLLM, LiteLLM, LM Studio). Enter the Base URL and Unified API Key below.",
+        "models_deep": [
+            "deepseek-ai/deepseek-r1",
+            "meta-llama/llama-3.3-70b-instruct",
+            "deepseek-ai/deepseek-v3",
+            "qwen/qwen-2.5-72b-instruct",
+        ],
+        "models_quick": [
+            "meta-llama/llama-3.3-70b-instruct",
+            "deepseek-ai/deepseek-v3",
+            "qwen/qwen-2.5-72b-instruct",
+            "mistralai/mistral-small-24b-instruct-2501",
+        ],
+    },
     "anthropic": {
         "name": "Anthropic Claude",
         "key_format": "sk-ant-...",
@@ -65,6 +89,20 @@ PROVIDERS_INFO = {
 }
 
 
+def get_provider_base_url(provider: str) -> str:
+    """Get the base URL for a provider (custom from DB or default)."""
+    db_url = get_setting(f"base_url_{provider}")
+    if db_url:
+        return db_url
+    return PROVIDERS_INFO.get(provider, {}).get("default_base_url", "https://freellmapi.com/v1")
+
+
+def save_provider_base_url(provider: str, base_url: str):
+    """Save a custom base URL for a provider."""
+    clean_url = base_url.strip().rstrip("/") if base_url else None
+    set_setting(f"base_url_{provider}", clean_url)
+
+
 def load_api_keys_into_env():
     """Load API keys from DB into os.environ. Call this at startup.
 
@@ -97,15 +135,21 @@ def get_api_keys_status() -> dict:
         env_value = os.environ.get(env_var, "")
         active_value = db_value or env_value
 
-        result[provider] = {
+        info = PROVIDERS_INFO.get(provider, {})
+        item = {
             "provider": provider,
-            "name": PROVIDERS_INFO.get(provider, {}).get("name", provider),
+            "name": info.get("name", provider),
             "configured": bool(active_value),
             "source": "ui" if db_value else ("env" if env_value else None),
             "masked": _mask_key(active_value) if active_value else None,
-            "signup_url": PROVIDERS_INFO.get(provider, {}).get("signup_url"),
-            "key_format": PROVIDERS_INFO.get(provider, {}).get("key_format"),
+            "signup_url": info.get("signup_url"),
+            "key_format": info.get("key_format"),
         }
+        if info.get("supports_custom_url"):
+            item["base_url"] = get_provider_base_url(provider)
+            item["default_base_url"] = info.get("default_base_url")
+
+        result[provider] = item
     return result
 
 
@@ -200,6 +244,34 @@ def test_api_key(provider: str, key: str | None = None) -> dict:
                     raise e
             return {"ok": True, "model": test_model, "message": "API key works!"}
 
+        elif provider in ("custom_router", "router", "freellmapi", "openrouter", "unorouter"):
+            from openai import OpenAI
+            base_url = get_provider_base_url(provider)
+            client = OpenAI(
+                api_key=key if key else "token",
+                base_url=base_url,
+                timeout=10.0,
+                default_headers={
+                    "HTTP-Referer": "https://github.com/vaibhavpotdar911/indian-trading-agent",
+                    "X-Title": "Indian Trading Agent",
+                },
+            )
+            test_model = "meta-llama/llama-3.3-70b-instruct"
+            try:
+                models_page = client.models.list()
+                model_names = [m.id for m in getattr(models_page, "data", [])]
+                if model_names:
+                    test_model = model_names[0]
+            except Exception:
+                pass
+
+            resp = client.chat.completions.create(
+                model=test_model,
+                max_tokens=5,
+                messages=[{"role": "user", "content": "hi"}],
+            )
+            return {"ok": True, "model": test_model, "message": f"Connected to {base_url} successfully!"}
+
         else:
             return {"ok": False, "error": f"Testing not implemented for {provider}"}
 
@@ -218,9 +290,19 @@ OBSOLETE_MODELS = {
 }
 
 
-def sanitize_model_name(model: str | None, kind: str = "quick") -> str:
+def sanitize_model_name(model: str | None, kind: str = "quick", provider: str | None = None) -> str:
     """Sanitize obsolete model names to active working models so unusable models are never loaded."""
-    if not model or model.lower() in OBSOLETE_MODELS:
+    if model and model.lower() in OBSOLETE_MODELS:
+        return "gemini-3.8-flash" if kind == "quick" else "gemini-3.8-pro"
+    if not model:
+        if provider == "custom_router":
+            return "meta-llama/llama-3.3-70b-instruct" if kind == "quick" else "deepseek-ai/deepseek-r1"
+        elif provider == "ollama":
+            return "qwen3:latest"
+        elif provider == "openai":
+            return "gpt-5.4-mini" if kind == "quick" else "gpt-5.4"
+        elif provider == "anthropic":
+            return "claude-haiku-4-5-20251001" if kind == "quick" else "claude-sonnet-4-20250514"
         return "gemini-3.8-flash" if kind == "quick" else "gemini-3.8-pro"
     return model
 
@@ -230,8 +312,8 @@ def get_llm_config() -> dict:
     from tradingagents.default_config import DEFAULT_CONFIG
 
     provider = get_setting("llm_provider") or DEFAULT_CONFIG["llm_provider"]
-    deep = sanitize_model_name(get_setting("deep_think_llm") or DEFAULT_CONFIG["deep_think_llm"], kind="deep")
-    quick = sanitize_model_name(get_setting("quick_think_llm") or DEFAULT_CONFIG["quick_think_llm"], kind="quick")
+    deep = sanitize_model_name(get_setting("deep_think_llm") or DEFAULT_CONFIG["deep_think_llm"], kind="deep", provider=provider)
+    quick = sanitize_model_name(get_setting("quick_think_llm") or DEFAULT_CONFIG["quick_think_llm"], kind="quick", provider=provider)
 
     return {
         "llm_provider": provider,
@@ -244,10 +326,12 @@ def save_llm_config(provider: str | None = None, deep_model: str | None = None, 
     """Save LLM provider/model settings to DB."""
     if provider is not None:
         set_setting("llm_provider", provider)
+    from tradingagents.default_config import DEFAULT_CONFIG
+    cur_provider = provider or get_setting("llm_provider") or DEFAULT_CONFIG["llm_provider"]
     if deep_model is not None:
-        set_setting("deep_think_llm", sanitize_model_name(deep_model, kind="deep"))
+        set_setting("deep_think_llm", sanitize_model_name(deep_model, kind="deep", provider=cur_provider))
     if quick_model is not None:
-        set_setting("quick_think_llm", sanitize_model_name(quick_model, kind="quick"))
+        set_setting("quick_think_llm", sanitize_model_name(quick_model, kind="quick", provider=cur_provider))
 
 
 def apply_llm_config_to_default():

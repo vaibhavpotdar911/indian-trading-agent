@@ -90,8 +90,10 @@ class StatsCallback(BaseCallbackHandler):
             # Record call in quota_tracker
             try:
                 from backend.quota_tracker import quota_tracker
-                provider = "google" if "gemini" in model_name.lower() else "llm"
-                quota_tracker.record_call(provider, model_name or "gemini-3.8-flash", int(input_tokens or 0), int(output_tokens or 0))
+                from backend.settings_manager import get_llm_config
+                cfg_prov = get_llm_config().get("llm_provider", "custom_router")
+                provider = "google" if "gemini" in model_name.lower() else cfg_prov
+                quota_tracker.record_call(provider, model_name or "active-model", int(input_tokens or 0), int(output_tokens or 0))
             except Exception:
                 pass
 

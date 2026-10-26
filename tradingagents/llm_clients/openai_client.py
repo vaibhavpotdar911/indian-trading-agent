@@ -21,11 +21,15 @@ class NormalizedChatOpenAI(ChatOpenAI):
 # Kwargs forwarded from user config to ChatOpenAI
 _PASSTHROUGH_KWARGS = (
     "timeout", "max_retries", "reasoning_effort",
-    "api_key", "callbacks", "http_client", "http_async_client",
+    "api_key", "callbacks", "http_client", "http_async_client", "default_headers",
 )
 
 # Provider base URLs and API key env vars
 _PROVIDER_CONFIG = {
+    "custom_router": ("https://freellmapi.com/v1", "CUSTOM_ROUTER_API_KEY"),
+    "router": ("https://freellmapi.com/v1", "CUSTOM_ROUTER_API_KEY"),
+    "freellmapi": ("https://freellmapi.com/v1", "FREELLMAPI_API_KEY"),
+    "unorouter": ("https://unorouter.ai/api/v1", "UNOROUTER_API_KEY"),
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY"),
     "deepseek": ("https://api.deepseek.com", "DEEPSEEK_API_KEY"),
     "qwen": ("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
@@ -41,7 +45,7 @@ class OpenAIClient(BaseLLMClient):
     For native OpenAI models, uses the Responses API (/v1/responses) which
     supports reasoning_effort with function tools across all model families
     (GPT-4.1, GPT-5). Third-party compatible providers (xAI, OpenRouter,
-    Ollama) use standard Chat Completions.
+    Ollama, Custom Router) use standard Chat Completions.
     """
 
     def __init__(
@@ -72,10 +76,37 @@ class OpenAIClient(BaseLLMClient):
         elif self.base_url:
             llm_kwargs["base_url"] = self.base_url
 
+        # Check DB settings for dynamically configured router base_url or api_key
+        try:
+            from backend.db import get_setting
+            db_base_url = get_setting(f"base_url_{self.provider}")
+            if db_base_url:
+                llm_kwargs["base_url"] = db_base_url
+            db_key = get_setting(f"api_key_{self.provider}")
+            if db_key and not llm_kwargs.get("api_key"):
+                llm_kwargs["api_key"] = db_key
+        except Exception:
+            pass
+
+        # If base_url was passed explicitly in constructor, respect it
+        if self.base_url:
+            llm_kwargs["base_url"] = self.base_url
+
         # Forward user-provided kwargs
         for key in _PASSTHROUGH_KWARGS:
             if key in self.kwargs:
                 llm_kwargs[key] = self.kwargs[key]
+
+        # Ensure custom router has standard headers for broad proxy/router compatibility
+        if self.provider in ("custom_router", "router", "openrouter", "freellmapi", "unorouter"):
+            headers = llm_kwargs.get("default_headers") or {}
+            headers.setdefault("HTTP-Referer", "https://github.com/vaibhavpotdar911/indian-trading-agent")
+            headers.setdefault("X-Title", "Indian Trading Agent")
+            llm_kwargs["default_headers"] = headers
+
+            # Fallback dummy key for self-hosted local routers (vLLM, LM Studio) if not set
+            if not llm_kwargs.get("api_key"):
+                llm_kwargs["api_key"] = os.environ.get("CUSTOM_ROUTER_API_KEY") or "token"
 
         # Native OpenAI: use Responses API for consistent behavior across
         # all model families. Third-party providers use Chat Completions.

@@ -285,6 +285,17 @@ export const saveLLMSettings = (data: { llm_provider?: string; deep_think_llm?: 
   });
 export const getProviders = () => fetchAPI(`/api/settings/providers`);
 export const getOllamaModels = () => fetchAPI(`/api/settings/ollama/models`);
+export const getRouterBaseUrl = (provider: string) => fetchAPI(`/api/settings/router/base-url/${provider}`);
+export const saveRouterBaseUrl = (provider: string, base_url: string) =>
+  fetchAPI(`/api/settings/router/base-url`, {
+    method: "PUT",
+    body: JSON.stringify({ provider, base_url }),
+  });
+export const discoverRouterModels = (data: { provider: string; base_url?: string; api_key?: string }) =>
+  fetchAPI(`/api/settings/router/discover-models`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 export const getQuotaStatus = () => fetchAPI(`/api/settings/quota`);
 
 // Learning Insights

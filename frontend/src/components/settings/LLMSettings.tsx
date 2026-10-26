@@ -10,6 +10,8 @@ import {
   deleteApiKey,
   testApiKey,
   getOllamaModels,
+  saveRouterBaseUrl,
+  discoverRouterModels,
 } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +27,9 @@ import {
   CheckCircle2,
   XCircle,
   ExternalLink,
+  Globe,
+  Sparkles,
+  Edit3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { statusColors, splitStatusColor } from "@/lib/status-colors";
@@ -37,6 +42,12 @@ type Provider = {
   note?: string;
   models_deep?: string[];
   models_quick?: string[];
+  supports_custom_url?: boolean;
+  base_url?: string;
+  default_base_url?: string;
+  type_badge?: string;
+  cost_tier?: string;
+  tool_support?: string;
 };
 
 type LLMConfig = { llm_provider: string; deep_think_llm: string; quick_think_llm: string };
@@ -51,6 +62,12 @@ export function LLMSettings() {
   const [selected, setSelected] = useState<string>("");
   const [models, setModels] = useState<Record<string, ModelSel>>({});
   const [ollama, setOllama] = useState<OllamaState>({ reachable: false, models: [], loading: false });
+
+  const [baseUrlInput, setBaseUrlInput] = useState("");
+  const [savingUrl, setSavingUrl] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+  const [manualInput, setManualInput] = useState<{ deep: boolean; quick: boolean }>({ deep: false, quick: false });
 
   const [keyInput, setKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -74,6 +91,10 @@ export function LLMSettings() {
       setProviders(provs);
       setApiKeys(keys);
       setSelected(cfg.llm_provider);
+
+      const activeUrl = keys[cfg.llm_provider]?.base_url || provs[cfg.llm_provider]?.base_url || provs[cfg.llm_provider]?.default_base_url || "";
+      setBaseUrlInput(activeUrl);
+
       const m: Record<string, ModelSel> = {};
       Object.entries(provs).forEach(([id, p]: any) => {
         m[id] = initModels(id, p, cfg);
@@ -129,8 +150,12 @@ export function LLMSettings() {
 
   const optionsFor = (kind: "deep" | "quick"): string[] => {
     let base: string[];
-    if (selected === "ollama" && ollama.reachable && ollama.models.length) base = ollama.models;
-    else base = (kind === "deep" ? cur?.models_deep : cur?.models_quick) || [];
+    if (selected === "ollama" && ollama.reachable && ollama.models.length) {
+      base = ollama.models;
+    } else {
+      const catalog = (kind === "deep" ? cur?.models_deep : cur?.models_quick) || [];
+      base = [...discoveredModels, ...catalog];
+    }
     const current = kind === "deep" ? sel.deep : sel.quick;
     return Array.from(new Set([current, ...base].filter((m) => m && !OBSOLETE_MODELS.has(m))));
   };
@@ -157,9 +182,62 @@ export function LLMSettings() {
 
   const selectProvider = (id: string) => {
     setSelected(id);
+    const p = providers[id];
+    const targetUrl = apiKeys[id]?.base_url || p?.base_url || p?.default_base_url || "";
+    setBaseUrlInput(targetUrl);
+    setDiscoveredModels([]);
     setKeyInput("");
     setShowKey(false);
     setTestRes(null);
+  };
+
+  const handleSaveBaseUrl = async (urlToSave?: string) => {
+    const targetUrl = (urlToSave !== undefined ? urlToSave : baseUrlInput).trim();
+    if (!targetUrl) return;
+    setSavingUrl(true);
+    try {
+      await saveRouterBaseUrl(selected, targetUrl);
+      setBaseUrlInput(targetUrl);
+      setProviders((prev) => ({
+        ...prev,
+        [selected]: { ...prev[selected], base_url: targetUrl },
+      }));
+      toast.success("Router Base URL saved");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save Base URL");
+    } finally {
+      setSavingUrl(false);
+    }
+  };
+
+  const handleDiscoverModels = async () => {
+    setDiscovering(true);
+    try {
+      const res: any = await discoverRouterModels({
+        provider: selected,
+        base_url: baseUrlInput.trim() || undefined,
+        api_key: keyInput.trim() || undefined,
+      });
+      if (res.reachable && res.models && res.models.length > 0) {
+        setDiscoveredModels(res.models);
+        toast.success(`Discovered ${res.models.length} live models`);
+        if (res.models[0]) {
+          setModels((m) => ({
+            ...m,
+            [selected]: {
+              deep: m[selected]?.deep || res.models[0],
+              quick: m[selected]?.quick || res.models[0],
+            },
+          }));
+        }
+      } else {
+        toast.error(res.error || "No models returned from endpoint");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Model discovery failed");
+    } finally {
+      setDiscovering(false);
+    }
   };
 
   const saveKey = async () => {
@@ -322,12 +400,109 @@ export function LLMSettings() {
               </div>
             </div>
 
-            <div className="p-4 space-y-3">
-              {/* Key entry (cloud) or local note (Ollama) */}
+            {/* Provider Characteristics Bar */}
+            <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 pb-1">
+              {cur.type_badge && (
+                <Badge variant="secondary" className="text-[10px] font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">
+                  {cur.type_badge}
+                </Badge>
+              )}
+              {cur.cost_tier && (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed">
+                  {cur.cost_tier}
+                </Badge>
+              )}
+              {cur.tool_support && (
+                <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-800">
+                  ✓ {cur.tool_support}
+                </Badge>
+              )}
+              {cur.supports_custom_url && (
+                <Badge variant="outline" className="text-[10px] text-blue-700 border-blue-300 dark:text-blue-400 dark:border-blue-800 flex items-center gap-1">
+                  <Globe className="h-2.5 w-2.5" /> Configurable Base URL
+                </Badge>
+              )}
+            </div>
+
+            <div className="p-4 space-y-3.5">
+              {/* Optional Custom Base URL section (for routers and OpenAI-compatible endpoints) */}
+              {cur.supports_custom_url && (
+                <div className="rounded-lg border border-border/70 bg-card p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold flex items-center gap-1.5 text-foreground">
+                      <Globe className="h-3.5 w-3.5 text-primary" /> Router / Endpoint Base URL
+                    </label>
+                    {cur.default_base_url && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBaseUrlInput(cur.default_base_url || "");
+                          handleSaveBaseUrl(cur.default_base_url);
+                        }}
+                        className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                      >
+                        Reset to default
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="text"
+                      placeholder="e.g. https://freellmapi.com/v1 or https://openrouter.ai/api/v1"
+                      value={baseUrlInput}
+                      onChange={(e) => setBaseUrlInput(e.target.value)}
+                      className="font-mono text-xs flex-1"
+                    />
+                    <Button size="sm" variant="outline" onClick={() => handleSaveBaseUrl()} disabled={savingUrl}>
+                      {savingUrl ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                      Save URL
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleDiscoverModels}
+                      disabled={discovering}
+                      title="Query live /models list from this endpoint"
+                    >
+                      {discovering ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                      Discover Models
+                    </Button>
+                  </div>
+                  {/* Preset quick links */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    <span className="text-[10px] text-muted-foreground">Quick Presets:</span>
+                    {[
+                      { name: "FreeLLMAPI", url: "https://freellmapi.com/v1" },
+                      { name: "OpenRouter", url: "https://openrouter.ai/api/v1" },
+                      { name: "UnoRouter", url: "https://unorouter.ai/api/v1" },
+                      { name: "Local vLLM", url: "http://localhost:8000/v1" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => {
+                          setBaseUrlInput(preset.url);
+                          handleSaveBaseUrl(preset.url);
+                        }}
+                        className="text-[10px] px-2 py-0.5 rounded border border-border bg-muted/50 hover:bg-muted text-foreground transition-colors"
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                  {discoveredModels.length > 0 && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      ✓ {discoveredModels.length} models discovered and loaded into selectors below.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Key entry (cloud / router) or local note (Ollama) */}
               {requiresKey(selected) ? (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[11px] font-semibold text-slate-700">API key</label>
+                    <label className="text-[11px] font-semibold text-slate-700">Unified API Key</label>
                     {cur.signup_url && !hasKey(selected) && (
                       <a href={cur.signup_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-600 hover:underline flex items-center gap-1">
                         Get key <ExternalLink className="h-3 w-3" />
@@ -343,7 +518,7 @@ export function LLMSettings() {
                     <div className="relative flex-1">
                       <Input
                         type={showKey ? "text" : "password"}
-                        placeholder={cur.key_format || "Enter API key..."}
+                        placeholder={cur.key_format || "Enter unified API key..."}
                         value={keyInput}
                         onChange={(e) => setKeyInput(e.target.value)}
                         className="pr-9 font-sans"
@@ -403,34 +578,74 @@ export function LLMSettings() {
               )}
 
               {/* Model selectors */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 mb-1 block">
-                    Deep think <span className="text-muted-foreground font-normal">(research + PM)</span>
-                  </label>
-                  <select
-                    value={sel.deep}
-                    onChange={(e) => setModel("deep", e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
-                  >
-                    {optionsFor("deep").map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-semibold text-slate-700">
+                      Deep think <span className="text-muted-foreground font-normal">(research + PM)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setManualInput((s) => ({ ...s, deep: !s.deep }))}
+                      className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
+                    >
+                      <Edit3 className="h-2.5 w-2.5" />
+                      {manualInput.deep ? "Select from list" : "Type custom ID"}
+                    </button>
+                  </div>
+                  {manualInput.deep ? (
+                    <Input
+                      type="text"
+                      placeholder="e.g. meta-llama/llama-3.3-70b-instruct or deepseek-ai/deepseek-r1"
+                      value={sel.deep}
+                      onChange={(e) => setModel("deep", e.target.value)}
+                      className="font-mono text-xs"
+                    />
+                  ) : (
+                    <select
+                      value={sel.deep}
+                      onChange={(e) => setModel("deep", e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm font-mono"
+                    >
+                      {optionsFor("deep").map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 mb-1 block">
-                    Quick think <span className="text-muted-foreground font-normal">(analysts + debates)</span>
-                  </label>
-                  <select
-                    value={sel.quick}
-                    onChange={(e) => setModel("quick", e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
-                  >
-                    {optionsFor("quick").map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-semibold text-slate-700">
+                      Quick think <span className="text-muted-foreground font-normal">(analysts + debates)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setManualInput((s) => ({ ...s, quick: !s.quick }))}
+                      className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
+                    >
+                      <Edit3 className="h-2.5 w-2.5" />
+                      {manualInput.quick ? "Select from list" : "Type custom ID"}
+                    </button>
+                  </div>
+                  {manualInput.quick ? (
+                    <Input
+                      type="text"
+                      placeholder="e.g. meta-llama/llama-3.3-70b-instruct or deepseek-ai/deepseek-v3"
+                      value={sel.quick}
+                      onChange={(e) => setModel("quick", e.target.value)}
+                      className="font-mono text-xs"
+                    />
+                  ) : (
+                    <select
+                      value={sel.quick}
+                      onChange={(e) => setModel("quick", e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm font-mono"
+                    >
+                      {optionsFor("quick").map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
             </div>

@@ -100,6 +100,20 @@ MODEL_OPTIONS: ProviderModeOptions = {
         ],
     },
     # OpenRouter: fetched dynamically. Azure: any deployed model name.
+    "custom_router": {
+        "quick": [
+            ("Llama 3.3 70B Instruct - Fast, strong reasoning", "meta-llama/llama-3.3-70b-instruct"),
+            ("DeepSeek V3 - High speed & accuracy", "deepseek-ai/deepseek-v3"),
+            ("Qwen 2.5 72B Instruct - Versatile multilingual", "qwen/qwen-2.5-72b-instruct"),
+            ("Mistral Small 24B - Low latency analyst", "mistralai/mistral-small-24b-instruct-2501"),
+        ],
+        "deep": [
+            ("DeepSeek R1 - Frontier open reasoning", "deepseek-ai/deepseek-r1"),
+            ("DeepSeek V3 - High speed & accuracy", "deepseek-ai/deepseek-v3"),
+            ("Llama 3.3 70B Instruct - Robust open weights", "meta-llama/llama-3.3-70b-instruct"),
+            ("Qwen 2.5 72B Instruct - Complex quantitative analysis", "qwen/qwen-2.5-72b-instruct"),
+        ],
+    },
     "ollama": {
         "quick": [
             ("Qwen3:latest (8B, local)", "qwen3:latest"),

@@ -46,8 +46,8 @@ class QuotaTracker:
             self.last_429_time = time.time()
             self.last_429_cooldown_seconds = cooldown_seconds
 
-    def get_status(self, provider: str = "google", model: str = "gemini-3.8-flash") -> Dict[str, Any]:
-        """Calculate live RPM, TPM, RPD, and readiness status."""
+    def get_status(self, provider: str = "custom_router", model: str = "") -> Dict[str, Any]:
+        """Calculate live RPM, TPM, RPD, and readiness status adapted to active provider."""
         now = time.time()
         one_min_ago = now - 60
         start_of_day = now - 86400
@@ -60,10 +60,29 @@ class QuotaTracker:
             tpm_used = sum(c["tokens"] for c in recent_calls)
             rpd_used = len(today_calls)
 
-            limits = self.DEFAULT_GEMINI_LIMITS
-            rpm_limit = limits["rpm"]
-            tpm_limit = limits["tpm"]
-            rpd_limit = limits["rpd"]
+            # Adaptive limits based on provider
+            provider_lower = (provider or "").lower()
+            if provider_lower in ("custom_router", "router", "freellmapi", "openrouter", "unorouter"):
+                rpm_limit = 120
+                tpm_limit = 2_000_000
+                rpd_limit = 10_000
+                provider_type = "router"
+            elif provider_lower == "ollama":
+                rpm_limit = 999
+                tpm_limit = 10_000_000
+                rpd_limit = 99_999
+                provider_type = "local"
+            elif provider_lower in ("openai", "anthropic"):
+                rpm_limit = 60
+                tpm_limit = 2_000_000
+                rpd_limit = 5_000
+                provider_type = "cloud"
+            else:
+                limits = self.DEFAULT_GEMINI_LIMITS
+                rpm_limit = limits["rpm"]
+                tpm_limit = limits["tpm"]
+                rpd_limit = limits["rpd"]
+                provider_type = "google"
 
             # Calculate cooldown remaining
             cooldown_remaining = 0
@@ -74,14 +93,18 @@ class QuotaTracker:
 
             # Determine overall status
             status = "ready"
-            status_message = "Ready for new analysis"
+            if provider_type == "router":
+                status_message = "Router ready"
+            elif provider_type == "local":
+                status_message = "Local offline ready"
+            else:
+                status_message = "Ready for new analysis"
 
             if cooldown_remaining > 0:
                 status = "cooldown"
                 status_message = f"Rate limit cooling down ({cooldown_remaining}s remaining)"
             elif rpm_used >= rpm_limit:
                 status = "cooldown"
-                # Find when the oldest call in the 1-min window expires
                 oldest_in_min = min(c["timestamp"] for c in recent_calls)
                 wait_sec = max(1, int(60 - (now - oldest_in_min)))
                 cooldown_remaining = wait_sec
@@ -89,7 +112,7 @@ class QuotaTracker:
             elif tpm_used >= tpm_limit * 0.9:
                 status = "warning"
                 status_message = f"High token usage ({tpm_used:,} / {tpm_limit:,} TPM)"
-            elif rpm_used >= rpm_limit - 3:
+            elif rpm_used >= rpm_limit - 3 and provider_type == "google":
                 status = "warning"
                 status_message = f"Approaching rate limit ({rpm_used}/{rpm_limit} RPM)"
 
