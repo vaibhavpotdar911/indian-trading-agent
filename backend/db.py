@@ -10,7 +10,7 @@ state directory without re-importing this module.
 import sqlite3
 import os
 import json
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from contextlib import contextmanager
 
@@ -118,6 +118,19 @@ def ensure_db():
                 summary_json TEXT NOT NULL,
                 insights_json TEXT NOT NULL,
                 model_metadata_json TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
+
+            -- Portfolio Daily Deep Analysis runs
+            CREATE TABLE IF NOT EXISTS portfolio_daily_analyses (
+                batch_id TEXT PRIMARY KEY,
+                run_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                total_holdings INTEGER NOT NULL,
+                completed_holdings INTEGER DEFAULT 0,
+                summary_json TEXT,
+                results_json TEXT,
                 created_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))
             );
@@ -850,6 +863,80 @@ def list_equity_portfolio_reviews(limit: int = 30) -> list[dict]:
             (limit,),
         ).fetchall()
         return [_decode_equity_portfolio_review(row) for row in rows]
+
+
+# --- Portfolio Daily Deep Analyses ---
+
+def save_portfolio_daily_analysis(record: dict):
+    with get_db() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO portfolio_daily_analyses
+            (batch_id, run_date, status, total_holdings, completed_holdings, summary_json, results_json, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+            (
+                record["batch_id"],
+                record.get("run_date", date.today().isoformat()),
+                record.get("status", "running"),
+                record.get("total_holdings", 0),
+                record.get("completed_holdings", 0),
+                json.dumps(record.get("summary", {})),
+                json.dumps(record.get("results", [])),
+            ),
+        )
+
+
+def update_portfolio_daily_analysis(batch_id: str, updates: dict):
+    with get_db() as conn:
+        current_row = conn.execute(
+            "SELECT * FROM portfolio_daily_analyses WHERE batch_id = ?", (batch_id,)
+        ).fetchone()
+        if not current_row:
+            return None
+        current = _decode_portfolio_daily_analysis(current_row)
+        current.update(updates)
+        save_portfolio_daily_analysis(current)
+        return current
+
+
+def _decode_portfolio_daily_analysis(row: sqlite3.Row | None) -> dict | None:
+    if not row:
+        return None
+    data = dict(row)
+    for column, key, default in (
+        ("summary_json", "summary", {}),
+        ("results_json", "results", []),
+    ):
+        raw = data.pop(column, None)
+        try:
+            data[key] = json.loads(raw) if raw else default
+        except (TypeError, ValueError, json.JSONDecodeError):
+            data[key] = default
+    return data
+
+
+def get_latest_portfolio_daily_analysis() -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM portfolio_daily_analyses ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+        return _decode_portfolio_daily_analysis(row)
+
+
+def get_portfolio_daily_analysis(batch_id: str) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM portfolio_daily_analyses WHERE batch_id = ?", (batch_id,)
+        ).fetchone()
+        return _decode_portfolio_daily_analysis(row)
+
+
+def list_portfolio_daily_analyses(limit: int = 20) -> list[dict]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM portfolio_daily_analyses ORDER BY rowid DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [_decode_portfolio_daily_analysis(row) for row in rows]
 
 
 # --- Paper Trades ---

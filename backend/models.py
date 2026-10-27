@@ -13,6 +13,7 @@ class AnalysisRequest(BaseModel):
     max_debate_rounds: int = 1
     max_risk_discuss_rounds: int = 1
     output_language: str = "English"
+    holding_info: Optional[dict] = None
 
 
 class AnalysisResponse(BaseModel):

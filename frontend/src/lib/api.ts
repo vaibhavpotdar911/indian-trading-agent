@@ -137,6 +137,24 @@ export const updatePnL = (taskId: string, data: { entry_price: number; exit_pric
   fetchAPI(`/api/analysis/${taskId}/pnl`, { method: "PUT", body: JSON.stringify(data) });
 export const getMemoryStats = () => fetchAPI(`/api/analysis/memory/stats`);
 
+// Portfolio Daily Deep Analysis
+export const getPortfolioHoldingsForAnalysis = () =>
+  fetchAPI(`/api/analysis/portfolio/holdings`);
+export const runPortfolioDailyAnalysis = (data: {
+  tickers?: string[];
+  analysts?: string[];
+  depth?: number;
+  trading_mode?: string;
+  language?: string;
+  trade_date?: string;
+}) => fetchAPI(`/api/analysis/portfolio/run`, { method: "POST", body: JSON.stringify(data) });
+export const getLatestPortfolioDailyAnalysis = () =>
+  fetchAPI(`/api/analysis/portfolio/latest`);
+export const getPortfolioDailyAnalysis = (batchId: string) =>
+  fetchAPI(`/api/analysis/portfolio/${batchId}`);
+export const getPortfolioDailyAnalysisHistory = (limit = 20) =>
+  fetchAPI(`/api/analysis/portfolio/history?limit=${limit}`);
+
 // Watchlist
 export const getWatchlist = () => fetchAPI(`/api/watchlist`);
 export const addToWatchlist = (ticker: string) =>
@@ -668,6 +686,22 @@ export const getBacktestHistory = (limit = 20) => fetchAPI(`/api/backtest/histor
 export function connectAnalysisWS<T = unknown>(taskId: string, onEvent: (event: T) => void): WebSocket {
   const wsBase = getWebSocketBase();
   const ws = new WebSocket(`${wsBase}/api/analysis/ws/${taskId}`);
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data) as T;
+      onEvent(data);
+    } catch {}
+  };
+  ws.onerror = () => notifyWebSocketUnavailable();
+  ws.onclose = (event) => {
+    if (event.code === 1008 || event.code === 4401) notifyAuthRequired();
+  };
+  return ws;
+}
+
+export function connectPortfolioAnalysisWS<T = unknown>(batchId: string, onEvent: (event: T) => void): WebSocket {
+  const wsBase = getWebSocketBase();
+  const ws = new WebSocket(`${wsBase}/api/analysis/portfolio/ws/${batchId}`);
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data) as T;

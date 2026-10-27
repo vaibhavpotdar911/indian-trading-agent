@@ -15,9 +15,13 @@ def create_neutral_debator(llm):
         fundamentals_report = state["fundamentals_report"]
 
         trader_decision = state["trader_investment_plan"]
+        holding = state.get("holding_info")
+        holding_ctx = ""
+        if holding:
+            holding_ctx = f"\n**EXISTING POSITION METRICS**: {holding.get('quantity')} shares @ ₹{holding.get('average_price')} (CMP: ₹{holding.get('last_price')}, P&L: ₹{holding.get('pnl')} / {holding.get('pnl_pct')}%)\n"
 
         prompt = f"""As the Neutral Risk Analyst for an **Indian market (NSE/BSE) short-term trading desk**, provide a balanced risk assessment. Weigh both upside potential and downside risks for this specific trade.
-
+{holding_ctx}
 Trader's decision: {trader_decision}
 
 **Your Balanced Framework for Indian Markets:**

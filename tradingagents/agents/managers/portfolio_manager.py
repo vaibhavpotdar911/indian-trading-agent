@@ -22,18 +22,47 @@ def create_portfolio_manager(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
+        holding = state.get("holding_info")
+        holding_section = ""
+        rating_scale = """- **Strong Buy**: High conviction — enter immediately with full planned position
+- **Buy**: Favorable setup — enter with partial position, scale in on dips
+- **Hold**: No new action — maintain existing position if any
+- **Sell**: Exit existing position or avoid entry
+- **Short**: Consider short position or put options (for F&O eligible stocks)"""
+
+        if holding:
+            qty = holding.get("quantity", 0)
+            avg_p = holding.get("average_price", 0)
+            cmp = holding.get("last_price", 0)
+            pnl = holding.get("pnl", 0)
+            pnl_pct = holding.get("pnl_pct", 0)
+            holding_section = f"""
+---
+**ACTIVE PORTFOLIO HOLDING CONTEXT (REAL MONEY IN POSITION):**
+- Quantity Held: {qty} shares
+- Average Cost Basis (Buy Price): ₹{avg_p}
+- Current Market Price: ₹{cmp}
+- Unrealized P&L: ₹{pnl} ({pnl_pct}%)
+
+**PORTFOLIO HOLDING VERDICT MANDATE:**
+You are reviewing an existing holding from the user's synced portfolio. Your decision MUST directly advise on their open position:
+Is it time to HOLD, ADD MORE on weakness, BOOK PROFIT on strength, or CUT LOSS to preserve capital?
+---"""
+            rating_scale = """- **Hold**: Thesis intact — retain existing shares.
+- **Add More**: High conviction dip/breakout — scale in with additional quantity.
+- **Book Profit**: Target reached or resistance ahead — take partial/full profit.
+- **Cut Loss**: Stop-loss triggered or thesis invalidated — exit position to preserve capital.
+- **Strong Buy** / **Buy** / **Sell**: (Fallback ratings if applicable)"""
+
         prompt = f"""As the Portfolio Manager for an **Indian market (NSE/BSE) short-term trading desk**, synthesize the risk analysts' debate and deliver the final trading decision.
 
 {instrument_context}
+{holding_section}
 
 ---
 
 **Rating Scale** (use exactly one):
-- **Strong Buy**: High conviction — enter immediately with full planned position
-- **Buy**: Favorable setup — enter with partial position, scale in on dips
-- **Hold**: No new action — maintain existing position if any
-- **Sell**: Exit existing position or avoid entry
-- **Short**: Consider short position or put options (for F&O eligible stocks)
+{rating_scale}
 
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
@@ -41,15 +70,15 @@ def create_portfolio_manager(llm, memory):
 - Lessons from past decisions: **{past_memory_str}**
 
 **Required Output Structure:**
-1. **Rating**: One of Strong Buy / Buy / Hold / Sell / Short
-2. **Entry Price**: Specific price level or "at market"
-3. **Stop-Loss**: Mandatory — specific price with reasoning
+1. **Rating**: One of Hold / Add More / Book Profit / Cut Loss / Strong Buy / Buy / Sell / Short
+2. **Entry Price / Current Price Action**: Current price and recommended adjustment
+3. **Stop-Loss**: Mandatory — specific price with reasoning (adjust trailing stop if in profit)
 4. **Target 1**: First profit-taking level
 5. **Target 2**: Extended target (if momentum sustains)
-6. **Position Size**: % of trading capital to deploy
+6. **Position Size / Action Quantity**: Recommended sizing adjustment
 7. **Time Horizon**: Intraday / 2-3 days / 1 week / 2 weeks
-8. **Risk-Reward Ratio**: Computed from entry/SL/target
-9. **Executive Summary**: Concise action plan with key risk levels
+8. **Risk-Reward Ratio**: Computed from current price/SL/target
+9. **Executive Summary**: Concise action plan for today with key risk levels
 10. **Investment Thesis**: Detailed reasoning from the debate and reflections
 
 **Indian Market Risk Factors to Consider:**

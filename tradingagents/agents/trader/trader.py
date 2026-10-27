@@ -23,9 +23,30 @@ def create_trader(llm, memory):
         else:
             past_memory_str = "No past memories found."
 
+        holding = state.get("holding_info")
+        holding_context_str = ""
+        holding_instructions = ""
+        if holding:
+            holding_context_str = f"""
+---
+**EXISTING PORTFOLIO HOLDING METRICS:**
+- Quantity Held: {holding.get('quantity', 0)} shares
+- Average Purchase Price: ₹{holding.get('average_price', 0)}
+- Current Market Price: ₹{holding.get('last_price', 0)}
+- Unrealized P&L: ₹{holding.get('pnl', 0)} ({holding.get('pnl_pct', 0)}%)
+---"""
+            holding_instructions = """
+**SPECIAL FOCUS FOR EXISTING PORTFOLIO HOLDING:**
+The user already holds this stock. Provide specific advice for their open position:
+- **HOLD**: Thesis intact, retain existing position.
+- **ADD / ACCUMULATE**: Strong risk-reward setup on dip/breakout to buy more shares.
+- **BOOK PROFIT / TRIM**: Stock near resistance or target; lock in profits.
+- **CUT LOSS / EXIT**: Key support broken or thesis invalidated; exit position.
+Conclude with 'FINAL TRANSACTION PROPOSAL: **HOLD / ADD / TRIM / EXIT**'."""
+
         context = {
             "role": "user",
-            "content": f"Based on a comprehensive analysis by a team of analysts, here is an investment plan tailored for {company_name}. {instrument_context} This plan incorporates insights from current technical market trends, macroeconomic indicators, and social media sentiment. Use this plan as a foundation for evaluating your next trading decision.\n\nProposed Investment Plan: {investment_plan}\n\nLeverage these insights to make an informed and strategic decision.",
+            "content": f"Based on a comprehensive analysis by a team of analysts, here is an investment plan tailored for {company_name}. {instrument_context} {holding_context_str} This plan incorporates insights from current technical market trends, macroeconomic indicators, and social media sentiment. Use this plan as a foundation for evaluating your next trading decision.\n\nProposed Investment Plan: {investment_plan}\n\nLeverage these insights to make an informed and strategic decision.",
         }
 
         messages = [
@@ -35,7 +56,7 @@ def create_trader(llm, memory):
 
 **Your Decision Framework:**
 Based on the investment plan and analyst reports, provide:
-1. **Action**: BUY / SELL / HOLD / SHORT
+1. **Action**: BUY / SELL / HOLD / SHORT (or HOLD / ADD / TRIM / EXIT if holding an existing position)
 2. **Entry Price**: Specific price or "at market open"
 3. **Stop-Loss**: Mandatory — use ATR-based or support/resistance level
 4. **Target 1**: Conservative profit target
@@ -44,6 +65,7 @@ Based on the investment plan and analyst reports, provide:
 7. **Time Horizon**: Intraday / 2-3 days / 1 week
 8. **Risk-Reward Ratio**: Calculate from entry, SL, and target
 9. **Order Type**: MARKET / LIMIT / SL-LIMIT (for NSE execution)
+{holding_instructions}
 
 **Indian Market Considerations:**
 - NSE market hours: 9:15 AM - 3:30 PM IST
@@ -52,7 +74,7 @@ Based on the investment plan and analyst reports, provide:
 - Factor in settlement cycle (T+1 for equities)
 - Consider opening gap risk from overnight global cues
 
-Always conclude with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm.
+Always conclude with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL/ADD/TRIM/EXIT**' to confirm.
 Apply lessons from past decisions: {past_memory_str}""",
             },
             context,

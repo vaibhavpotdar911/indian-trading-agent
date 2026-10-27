@@ -18,7 +18,14 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 _tasks: dict[str, dict] = {}
 
 
-def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict, selected_analysts: list[str] = None):
+def _run_analysis_sync(
+    task_id: str,
+    ticker: str,
+    trade_date: str,
+    config: dict,
+    selected_analysts: list[str] = None,
+    holding_info: dict = None,
+):
     """Run the trading agent analysis in a background thread."""
     import asyncio
     import traceback
@@ -58,12 +65,15 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
             "signal": "ANALYZING...",
             "duration_seconds": 0,
         }
+        if holding_info:
+            current_result["holding_info"] = holding_info
+
         save_analysis(task_id, current_result)
         _tasks[task_id]["result"] = current_result
 
         # Stream the graph execution
         propagator = Propagator(max_recur_limit=config.get("max_recur_limit", 100))
-        init_state = propagator.create_initial_state(ticker, trade_date)
+        init_state = propagator.create_initial_state(ticker, trade_date, holding_info=holding_info)
         stream_args = propagator.get_graph_args()
 
         prev_reports = {}
@@ -209,6 +219,8 @@ def _run_analysis_sync(task_id: str, ticker: str, trade_date: str, config: dict,
             "stats": stats_summary,
             "duration_seconds": round(duration, 1),
         }
+        if holding_info:
+            result_data["holding_info"] = holding_info
 
         save_analysis(task_id, result_data)
         _tasks[task_id]["status"] = "completed"
@@ -260,7 +272,7 @@ def run_analysis(req: AnalysisRequest):
 
     thread = threading.Thread(
         target=_run_analysis_sync,
-        args=(task_id, ticker, req.trade_date, config, req.analysts),
+        args=(task_id, ticker, req.trade_date, config, req.analysts, req.holding_info),
         daemon=True,
     )
     thread.start()

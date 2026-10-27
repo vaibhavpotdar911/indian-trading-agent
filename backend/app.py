@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 import asyncio
 from backend.db import ensure_db, get_setting
 from backend.auth import AuthMiddleware, allowed_origins
-from backend.routers import market_data, analysis, watchlist, backtest, strategies, scanner, performance, recommender, settings as settings_router, news as news_router, simulation as simulation_router, insights as insights_router, fii_dii as fii_dii_router, calendar as calendar_router, concentration as concentration_router, daily_verdict as daily_verdict_router, signal_performance as signal_performance_router, verdict_calibration as verdict_calibration_router, regime as regime_router, confidence_calibration as confidence_calibration_router, shadow_trades as shadow_trades_router, memory as memory_router, auth as auth_router, kite as kite_router, upstox as upstox_router, kotak_neo as kotak_neo_router, equity_portfolio as equity_portfolio_router, positions as positions_router, telegram as telegram_router, institutional as institutional_router, trading_modes as trading_modes_router, risk as risk_router, realistic_backtest as realistic_backtest_router, kotak_feed as kotak_feed_router, fundamental_backtest as fundamental_backtest_router, auto_trade as auto_trade_router
+from backend.routers import market_data, analysis, watchlist, backtest, strategies, scanner, performance, recommender, settings as settings_router, news as news_router, simulation as simulation_router, insights as insights_router, fii_dii as fii_dii_router, calendar as calendar_router, concentration as concentration_router, daily_verdict as daily_verdict_router, signal_performance as signal_performance_router, verdict_calibration as verdict_calibration_router, regime as regime_router, confidence_calibration as confidence_calibration_router, shadow_trades as shadow_trades_router, memory as memory_router, auth as auth_router, kite as kite_router, upstox as upstox_router, kotak_neo as kotak_neo_router, equity_portfolio as equity_portfolio_router, positions as positions_router, telegram as telegram_router, institutional as institutional_router, trading_modes as trading_modes_router, risk as risk_router, realistic_backtest as realistic_backtest_router, kotak_feed as kotak_feed_router, fundamental_backtest as fundamental_backtest_router, auto_trade as auto_trade_router, portfolio_analysis as portfolio_analysis_router
 from backend.settings_manager import load_api_keys_into_env, apply_llm_config_to_default
 
 
@@ -76,6 +76,7 @@ app.add_middleware(AuthMiddleware)
 app.include_router(auth_router.router)
 app.include_router(market_data.router)
 app.include_router(analysis.router)
+app.include_router(portfolio_analysis_router.router)
 app.include_router(watchlist.router)
 app.include_router(backtest.router)
 app.include_router(strategies.router)

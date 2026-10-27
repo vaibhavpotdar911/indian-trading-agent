@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional, Dict, Any
 from typing_extensions import TypedDict
 from langgraph.graph import MessagesState
 
@@ -70,3 +70,7 @@ class AgentState(MessagesState):
         RiskDebateState, "Current state of the debate on evaluating risk"
     ]
     final_trade_decision: Annotated[str, "Final decision made by the Risk Analysts"]
+    holding_info: Annotated[
+        Optional[Dict[str, Any]],
+        "Existing portfolio holding metrics (buy_price, current_price, quantity, pnl, etc.)"
+    ]

@@ -15,9 +15,13 @@ def create_conservative_debator(llm):
         fundamentals_report = state["fundamentals_report"]
 
         trader_decision = state["trader_investment_plan"]
+        holding = state.get("holding_info")
+        holding_ctx = ""
+        if holding:
+            holding_ctx = f"\n**EXISTING POSITION AT RISK**: {holding.get('quantity')} shares @ ₹{holding.get('average_price')} (CMP: ₹{holding.get('last_price')}, P&L: ₹{holding.get('pnl')} / {holding.get('pnl_pct')}%)\n"
 
         prompt = f"""As the Conservative Risk Analyst for an **Indian market (NSE/BSE) short-term trading desk**, your priority is capital preservation and risk mitigation. Critically examine the trade for excessive risk.
-
+{holding_ctx}
 Trader's decision: {trader_decision}
 
 **Indian Market Conservative Arguments:**

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   getBrokerTabs,
@@ -50,6 +51,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Send,
+  Sparkles,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -734,10 +736,17 @@ function EquityPortfolioAnalysisContent() {
           </h1>
           <p className="text-sm text-muted-foreground">Read-only Kite & Upstox holdings review with stored daily insights</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={runReview} disabled={running || positionCount === 0}>
+        <div className="flex flex-wrap gap-2 items-center">
+          <Link
+            href="/analysis?tab=portfolio"
+            className="inline-flex items-center px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5 mr-1.5 text-yellow-300" />
+            Run Daily Deep Analysis
+          </Link>
+          <Button size="sm" variant="outline" onClick={runReview} disabled={running || positionCount === 0}>
             {running ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
-            Run Review
+            Fast Review
           </Button>
           {status?.connected_today && (
             <Button variant="ghost" size="sm" onClick={disconnect}>
