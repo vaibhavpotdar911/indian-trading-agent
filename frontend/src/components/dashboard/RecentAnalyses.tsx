@@ -69,16 +69,16 @@ export function RecentAnalyses() {
   return (
     <>
       <Card className="border border-border/50 bg-card/60 backdrop-blur-md shadow-xl">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3 flex flex-row items-start sm:items-center justify-between gap-2">
           <div>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <History className="h-4 w-4 text-primary" /> Stored Agent Reports
+              <History className="h-4 w-4 text-primary shrink-0" /> Stored Agent Reports
             </CardTitle>
-            <CardDescription className="text-xs">
-              Quick access to recent multi-agent analysis results & status
+            <CardDescription className="text-xs mt-0.5">
+              Quick access to recent multi-agent analysis results &amp; status
             </CardDescription>
           </div>
-          <Link href="/history" className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
+          <Link href="/history" className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1 shrink-0 pt-0.5 sm:pt-0">
             View All <History className="h-3 w-3" />
           </Link>
         </CardHeader>
@@ -99,55 +99,54 @@ export function RecentAnalyses() {
               return (
                 <div
                   key={a.task_id}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border/40 bg-muted/30 hover:bg-muted/60 transition-all duration-200 group"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-3.5 rounded-xl border border-border/40 bg-muted/30 hover:bg-muted/60 transition-all duration-200 gap-2.5 sm:gap-3"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm tracking-tight">{a.ticker}</span>
+                  <div className="space-y-1.5 min-w-0 flex-1">
+                    <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
+                      <span className="font-bold text-sm tracking-tight text-foreground">{a.ticker}</span>
                       {itemInterrupted ? (
-                        <Badge variant="outline" className="bg-rose-500/10 text-rose-400 border-rose-500/30 text-[10px] py-0 px-2 flex items-center gap-1 font-semibold">
-                          <AlertTriangle className="h-3 w-3" /> INTERRUPTED
+                        <Badge variant="outline" className="bg-rose-500/10 text-rose-400 border-rose-500/30 text-[10px] py-0.5 px-2 flex items-center gap-1 font-semibold whitespace-nowrap">
+                          <AlertTriangle className="h-2.5 w-2.5 shrink-0" /> INTERRUPTED
                         </Badge>
                       ) : isRunning ? (
-                        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-[10px] py-0 px-2 animate-pulse flex items-center gap-1 font-medium">
-                          <Clock className="h-3 w-3" /> IN PROGRESS
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-[10px] py-0.5 px-2 animate-pulse flex items-center gap-1 font-medium whitespace-nowrap">
+                          <Clock className="h-2.5 w-2.5 shrink-0" /> IN PROGRESS
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className={`${signalColors[a.signal] || ""} text-[10px] py-0 px-2`}>
+                        <Badge variant="outline" className={`${signalColors[a.signal] || ""} text-[10px] py-0.5 px-2 whitespace-nowrap`}>
                           {a.signal}
                         </Badge>
                       )}
+                      {a.pnl_status && a.pnl_status !== "pending" && (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                          a.pnl_pct && a.pnl_pct >= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"
+                        }`}>
+                          {a.pnl_pct != null ? `${a.pnl_pct >= 0 ? "+" : ""}${a.pnl_pct}% P&L` : a.pnl_status}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                       <span>{a.trade_date}</span>
                       {a.duration_seconds ? (
                         <>
-                          <span>•</span>
+                          <span className="opacity-40">•</span>
                           <span>{Math.round(a.duration_seconds)}s scan</span>
                         </>
                       ) : null}
-                      {a.pnl_status && a.pnl_status !== "pending" && (
-                        <>
-                          <span>•</span>
-                          <span className={a.pnl_pct && a.pnl_pct >= 0 ? "text-emerald-400 font-medium" : "text-rose-400 font-medium"}>
-                            {a.pnl_pct != null ? `${a.pnl_pct >= 0 ? "+" : ""}${a.pnl_pct}% P&L` : a.pnl_status}
-                          </span>
-                        </>
-                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/30">
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="h-8 px-2.5 text-xs font-medium bg-secondary/80 hover:bg-secondary border border-border/40 shadow-sm"
+                      className="h-8 flex-1 sm:flex-initial px-3 text-xs font-medium bg-secondary/80 hover:bg-secondary border border-border/40 shadow-sm"
                       onClick={() => openPreview(a.task_id)}
                     >
                       <Eye className="h-3.5 w-3.5 mr-1 text-primary" /> Preview
                     </Button>
-                    <Link href={`/analysis/${a.task_id}`}>
-                      <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs font-medium border-border/60 hover:border-primary/50">
+                    <Link href={`/analysis/${a.task_id}`} className="flex-1 sm:flex-initial">
+                      <Button size="sm" variant="outline" className="h-8 w-full px-3 text-xs font-medium border-border/60 hover:border-primary/50">
                         <ExternalLink className="h-3.5 w-3.5 mr-1" /> Full Page
                       </Button>
                     </Link>
@@ -161,38 +160,38 @@ export function RecentAnalyses() {
 
       {/* Quick Preview Modal */}
       <Dialog open={!!selectedTaskId} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
-        <DialogContent className="sm:max-w-6xl w-[95vw] max-h-[92vh] h-[90vh] overflow-y-auto bg-card/95 backdrop-blur-xl border border-border/60 shadow-2xl p-6 md:p-8">
-          <DialogHeader className="pb-4 border-b border-border/40">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-6">
-              <div>
-                <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <span>{previewResult?.ticker || "Analysis"} Report Preview</span>
+        <DialogContent className="sm:max-w-6xl w-[96vw] max-h-[92vh] h-[92vh] overflow-y-auto bg-card/95 backdrop-blur-xl border border-border/60 shadow-2xl p-4 sm:p-6 md:p-8">
+          <DialogHeader className="pb-3 sm:pb-4 border-b border-border/40">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pr-7 sm:pr-8">
+              <div className="min-w-0">
+                <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 truncate">
+                  <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+                  <span className="truncate">{previewResult?.ticker || "Analysis"} Report Preview</span>
                 </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground mt-1">
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
                   {previewResult?.trade_date ? `Scanned for trade date: ${previewResult.trade_date}` : "Analysis details and agent intelligence"}
                 </DialogDescription>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-wrap gap-2">
                 {isInterrupted ? (
-                  <Badge variant="outline" className="bg-rose-500/15 text-rose-400 border-rose-500/40 px-3 py-1 font-semibold text-xs flex items-center gap-1.5 shadow-sm">
-                    <AlertTriangle className="h-3.5 w-3.5" /> Interrupted / Terminated
+                  <Badge variant="outline" className="bg-rose-500/15 text-rose-400 border-rose-500/40 px-2.5 py-1 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm">
+                    <AlertTriangle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> Interrupted
                   </Badge>
                 ) : previewResult?.signal === "ANALYZING..." ? (
-                  <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/40 px-3 py-1 animate-pulse font-semibold text-xs flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" /> In Progress
+                  <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/40 px-2.5 py-1 animate-pulse font-semibold text-[11px] sm:text-xs flex items-center gap-1.5">
+                    <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> In Progress
                   </Badge>
                 ) : previewResult ? (
-                  <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/40 px-3 py-1 font-semibold text-xs flex items-center gap-1.5 shadow-sm">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Completed ({generatedReportsCount} Reports)
+                  <Badge variant="outline" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/40 px-2.5 py-1 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm">
+                    <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /> {generatedReportsCount} Reports
                   </Badge>
                 ) : null}
 
                 {selectedTaskId && (
                   <Link href={`/analysis/${selectedTaskId}`}>
-                    <Button size="sm" className="h-8 text-xs font-semibold shadow-md">
-                      <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open Full Page
+                    <Button size="sm" className="h-7 sm:h-8 text-xs font-semibold shadow-md px-2.5 sm:px-3">
+                      <ExternalLink className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" /> Open Full Page
                     </Button>
                   </Link>
                 )}
@@ -206,25 +205,25 @@ export function RecentAnalyses() {
               <p className="text-sm font-medium">Fetching stored agent reports...</p>
             </div>
           ) : previewResult ? (
-            <div className="space-y-5 pt-3">
+            <div className="space-y-4 sm:space-y-5 pt-3">
               {/* Interruption alert banner with details */}
               {isInterrupted && (
                 <Card className="border-rose-500/50 bg-rose-500/10 dark:bg-rose-950/40 shadow-lg">
-                  <CardContent className="p-4 space-y-2.5">
+                  <CardContent className="p-3.5 sm:p-4 space-y-2.5">
                     <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
-                      <ShieldAlert className="h-5 w-5 text-rose-400 shrink-0" />
+                      <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5 text-rose-400 shrink-0" />
                       Analysis Execution Interrupted
                     </div>
-                    <p className="text-xs text-rose-300 font-mono bg-rose-950/50 p-2.5 rounded-lg border border-rose-500/20 break-words leading-relaxed">
-                      {previewResult.error_message || "Google Gemini free tier limit reached (20 requests/day). Execution was halted before all agent stages completed."}
+                    <p className="text-xs text-rose-300 font-mono bg-rose-950/50 p-2 sm:p-2.5 rounded-lg border border-rose-500/20 break-words leading-relaxed">
+                      {previewResult.error_message || "Analysis execution was halted before all agent stages could complete."}
                     </p>
                     <div className="text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-rose-500/20">
                       <span>
-                        💡 <strong>Partial Data Available:</strong> {generatedReportsCount > 0 ? `${generatedReportsCount} agent report(s) generated prior to interruption are viewable below.` : "No complete reports were stored before the limit was hit."}
+                        💡 <strong>Partial Data Available:</strong> {generatedReportsCount > 0 ? `${generatedReportsCount} agent report(s) generated prior to interruption are viewable below.` : "No complete reports were stored before interruption."}
                       </span>
-                      <Link href="/settings" className="shrink-0">
-                        <Button size="sm" variant="outline" className="h-7 text-xs border-rose-500/40 hover:bg-rose-500/20 text-rose-300">
-                          <RefreshCw className="h-3 w-3 mr-1" /> Switch LLM Model
+                      <Link href="/settings" className="shrink-0 w-full sm:w-auto">
+                        <Button size="sm" variant="outline" className="h-7 w-full sm:w-auto text-xs border-rose-500/40 hover:bg-rose-500/20 text-rose-300">
+                          <RefreshCw className="h-3 w-3 mr-1" /> LLM Settings
                         </Button>
                       </Link>
                     </div>

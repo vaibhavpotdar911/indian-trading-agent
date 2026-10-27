@@ -63,11 +63,11 @@ export function AnalysisOptions({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-accent/30 transition-colors rounded-t-lg"
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-accent/30 transition-colors rounded-t-lg gap-2"
         disabled={disabled}
       >
-        <div className="flex items-center gap-2">
-          <Settings2 className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Settings2 className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-medium text-sm">Customize Analysis</span>
           <Badge variant="outline" className="text-xs">
             {analysts.length} agents · Depth {depth} · {language}
@@ -76,7 +76,7 @@ export function AnalysisOptions({
             ~Rs.{estCost}
           </Badge>
         </div>
-        {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        {expanded ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
       </button>
 
       {expanded && (
@@ -84,7 +84,7 @@ export function AnalysisOptions({
           {/* Analysts */}
           <div>
             <label className="text-xs font-medium mb-2 block">Analysts (select which to run)</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {availableAnalysts.map((a) => {
                 const active = analysts.includes(a.value);
                 return (
@@ -93,27 +93,29 @@ export function AnalysisOptions({
                     type="button"
                     onClick={() => toggleAnalyst(a.value)}
                     disabled={disabled}
-                    className={`p-2 rounded-lg border text-left transition-colors ${
+                    className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all ${
                       active
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/30 opacity-60"
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border hover:border-primary/30 opacity-60 bg-muted/20"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium">{a.label}</span>
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <span className={`text-xs sm:text-sm font-semibold ${active ? "text-primary" : "text-foreground"}`}>
+                        {a.label}
+                      </span>
                       <input
                         type="checkbox"
                         checked={active}
                         readOnly
-                        className="h-3 w-3 pointer-events-none"
+                        className="h-3.5 w-3.5 rounded pointer-events-none accent-primary shrink-0"
                       />
                     </div>
-                    <p className="text-[10px] text-muted-foreground">{a.description}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">{a.description}</p>
                   </button>
                 );
               })}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-1.5">
               Fewer analysts = faster + cheaper. At least 1 is required.
             </p>
           </div>
@@ -121,7 +123,7 @@ export function AnalysisOptions({
           {/* Research Depth */}
           <div>
             <label className="text-xs font-medium mb-2 block">Research Depth (debate rounds)</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {depthOptions.map((d) => (
                 <button
                   key={d.value}

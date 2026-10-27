@@ -64,21 +64,21 @@ function AnalysisPageInner() {
   const displayTicker = analysis.ticker || tickerInput;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-3.5 sm:p-4 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Run Analysis</h1>
-          <p className="text-sm text-muted-foreground">Multi-agent AI analysis for Indian market stocks</p>
+          <h1 className="text-xl sm:text-2xl font-bold">Run Analysis</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Multi-agent AI analysis for Indian market stocks</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <QuotaWidget compact />
-          <Button variant="outline" size="sm" onClick={() => setCalcOpen(true)}>
-            <Calculator className="h-3 w-3 mr-2" />
+          <Button variant="outline" size="sm" onClick={() => setCalcOpen(true)} className="h-8 text-xs">
+            <Calculator className="h-3.5 w-3.5 mr-1.5" />
             Position Calc
           </Button>
           {analysis.status !== "idle" && (
-            <Button variant="outline" size="sm" onClick={analysis.reset}>
-              <RotateCcw className="h-3 w-3 mr-2" />
+            <Button variant="outline" size="sm" onClick={analysis.reset} className="h-8 text-xs">
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               New Analysis
             </Button>
           )}
@@ -198,9 +198,9 @@ function AnalysisPageInner() {
 
       {/* Main Content */}
       {(analysis.status === "running" || analysis.status === "completed") && (
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 items-start">
           {/* Left: Agent Progress */}
-          <div className="col-span-1">
+          <div className="col-span-1 lg:col-span-1 min-w-0">
             <AgentProgress
               reports={analysis.reports}
               debates={analysis.debates}
@@ -211,7 +211,7 @@ function AnalysisPageInner() {
           </div>
 
           {/* Right: Reports */}
-          <div className="col-span-3 space-y-4">
+          <div className="col-span-1 lg:col-span-3 space-y-4 min-w-0">
             <ReportPanel reports={analysis.reports} />
 
             <DebateView

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Open_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -16,6 +16,12 @@ const openSans = Open_Sans({
 export const metadata: Metadata = {
   title: "Indian Trading Agent",
   description: "AI-powered short-term trading decisions for NSE/BSE",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({

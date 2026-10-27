@@ -8,7 +8,7 @@ import { ReportPanel } from "@/components/analysis/ReportPanel";
 import { DebateView } from "@/components/analysis/DebateView";
 import { StatsCard } from "@/components/analysis/StatsCard";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, History, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, History, LayoutDashboard, Activity } from "lucide-react";
 import Link from "next/link";
 import type { AnalysisResult } from "@/lib/types";
 
@@ -17,6 +17,7 @@ export default function AnalysisDetailPage() {
   const router = useRouter();
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showStats, setShowStats] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -57,29 +58,42 @@ export default function AnalysisDetailPage() {
   if (result.final_trade_decision) reports.final_trade_decision = result.final_trade_decision;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
+    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 pb-2 border-b border-border/30">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <Button variant="outline" size="sm" onClick={() => router.back()} className="h-8 px-2.5 shrink-0">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{result.ticker} Stored Report</h1>
-            <p className="text-sm text-muted-foreground">
-              Date: {result.trade_date} | Task ID: <span className="font-mono text-xs">{result.task_id}</span>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight truncate">{result.ticker} Stored Report</h1>
+            <p className="text-xs text-muted-foreground truncate">
+              Date: {result.trade_date} <span className="opacity-40">•</span> Task: <span className="font-mono text-[11px]">{result.task_id?.slice(0, 8)}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto justify-end">
+          {result.stats && (
+            <Button
+              variant={showStats ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowStats((s) => !s)}
+              className={`text-xs h-8 font-medium transition-all ${
+                showStats ? "bg-primary/10 text-primary border-primary/30" : ""
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5 mr-1.5 text-primary" />
+              {showStats ? "Hide Stats" : "Analysis Stats"}
+            </Button>
+          )}
           <Link href="/">
-            <Button variant="outline" size="sm">
-              <LayoutDashboard className="h-4 w-4 mr-1" /> Dashboard
+            <Button variant="outline" size="sm" className="text-xs h-8">
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> Dashboard
             </Button>
           </Link>
           <Link href="/history">
-            <Button variant="outline" size="sm">
-              <History className="h-4 w-4 mr-1" /> Trade History
+            <Button variant="outline" size="sm" className="text-xs h-8">
+              <History className="h-3.5 w-3.5 mr-1.5" /> History
             </Button>
           </Link>
         </div>
@@ -87,8 +101,11 @@ export default function AnalysisDetailPage() {
 
       <DecisionCard signal={result.signal} ticker={result.ticker} duration={result.duration_seconds} />
 
-      {result.stats && (
-        <StatsCard stats={result.stats} duration={result.duration_seconds} />
+      {/* Analysis stats: hidden by default, shown when the top button is pressed */}
+      {showStats && result.stats && (
+        <div className="animate-in fade-in-50 duration-200">
+          <StatsCard stats={result.stats} duration={result.duration_seconds} />
+        </div>
       )}
 
       <ReportPanel reports={reports} />

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LLMSettings } from "@/components/settings/LLMSettings";
-import { QuotaWidget } from "@/components/QuotaWidget";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { statusColors } from "@/lib/status-colors";
 import { RiskSettings } from "@/components/settings/RiskSettings";
@@ -69,8 +68,6 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-sm text-muted-foreground">Manage API keys, LLM provider, and view current configuration</p>
       </div>
-
-      <QuotaWidget />
 
       <Card>
         <CardHeader className="pb-3">
@@ -224,11 +221,11 @@ export default function SettingsPage() {
                   <td className="text-right">3-5 min</td>
                 </tr>
                 <tr className="border-b">
-                  <td className="py-2">Gemini 2.0 Flash (cheapest)</td>
-                  <td className="text-right">$0.10/M</td>
-                  <td className="text-right">$0.40/M</td>
-                  <td className="text-right font-medium text-green-600">Rs.3-5</td>
-                  <td className="text-right">1-2 min</td>
+                  <td className="py-2 font-medium text-foreground">Custom Router (FreeLLMAPI / vLLM)</td>
+                  <td className="text-right">Free / Varies</td>
+                  <td className="text-right">Free / Varies</td>
+                  <td className="text-right font-medium text-green-600">Rs.0 - Low</td>
+                  <td className="text-right">Fast / Open-Source</td>
                 </tr>
                 <tr>
                   <td className="py-2 font-medium text-foreground">Ollama (local models)</td>

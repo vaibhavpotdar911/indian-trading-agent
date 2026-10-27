@@ -80,23 +80,37 @@ export function AgentProgress({ reports, debates, riskDebates, signal, status }:
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">Agent Pipeline</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 space-y-2">
-        {agents.map((agent) => (
-          <div key={agent.name} className="flex items-center gap-2">
-            {statusIcon(agent.status)}
-            <span className={`text-sm ${
-              agent.status === "completed" ? "text-foreground" :
-              agent.status === "running" ? "text-blue-400 font-medium" :
-              "text-muted-foreground"
-            }`}>
-              {agent.name}
+    <Card className="w-full">
+      <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+        <CardTitle className="text-xs sm:text-sm flex items-center justify-between">
+          <span>Agent Pipeline</span>
+          {status === "running" && (
+            <span className="text-[10px] font-normal text-blue-500 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> In Progress
             </span>
-          </div>
-        ))}
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-1 gap-2">
+          {agents.map((agent) => (
+            <div key={agent.name} className="flex items-center gap-2 min-w-0">
+              <span className="shrink-0">{statusIcon(agent.status)}</span>
+              <span
+                className={`text-xs sm:text-sm truncate ${
+                  agent.status === "completed"
+                    ? "text-foreground font-medium"
+                    : agent.status === "running"
+                    ? "text-blue-500 font-semibold"
+                    : "text-muted-foreground"
+                }`}
+                title={agent.name}
+              >
+                {agent.name}
+              </span>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

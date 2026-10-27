@@ -64,10 +64,10 @@ export function QuotaWidget({ compact = false }: { compact?: boolean }) {
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 text-xs bg-muted/60 border rounded-lg px-3 py-1.5">
-        <div className="flex items-center gap-1.5 font-medium">
+      <div className="flex items-center gap-2 sm:gap-3 text-xs bg-muted/60 border rounded-lg px-2.5 sm:px-3 py-1.5 max-w-full flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-1.5 font-medium shrink-0">
           <Activity className="h-3.5 w-3.5 text-primary" />
-          <span>Gemini Quota:</span>
+          <span>LLM Engine:</span>
         </div>
 
         {cooldownCountdown > 0 ? (
@@ -97,7 +97,7 @@ export function QuotaWidget({ compact = false }: { compact?: boolean }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Gemini API Rate Limit & Quota</h3>
+            <h3 className="text-sm font-semibold">LLM Rate Limit &amp; Quota</h3>
           </div>
           {cooldownCountdown > 0 ? (
             <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 animate-pulse">

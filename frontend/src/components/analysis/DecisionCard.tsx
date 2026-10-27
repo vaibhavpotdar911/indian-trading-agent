@@ -27,21 +27,21 @@ export function DecisionCard({ signal, ticker, duration }: Props) {
   const Icon = config.icon;
 
   return (
-    <Card className={`${config.bg} border-2`}>
-      <CardContent className="p-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-full ${config.bg}`}>
-            <Icon className={`h-8 w-8 ${config.color}`} />
+    <Card className={`${config.bg} border-2 shadow-sm`}>
+      <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className={`p-2.5 sm:p-3 rounded-full ${config.bg} shrink-0`}>
+            <Icon className={`h-6 w-6 sm:h-8 sm:w-8 ${config.color}`} />
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Final Decision for {ticker}</p>
-            <p className={`text-3xl font-bold ${config.color}`}>{signal}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Final Decision for {ticker}</p>
+            <p className={`text-2xl sm:text-3xl font-bold tracking-tight ${config.color}`}>{signal}</p>
           </div>
         </div>
         {duration && (
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Analysis Duration</p>
-            <p className="text-lg font-sans">{Math.round(duration)}s</p>
+          <div className="text-left sm:text-right w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-border/20 flex sm:block justify-between items-center">
+            <p className="text-[11px] sm:text-xs text-muted-foreground">Analysis Duration</p>
+            <p className="text-sm sm:text-lg font-sans font-medium">{Math.round(duration)}s</p>
           </div>
         )}
       </CardContent>
