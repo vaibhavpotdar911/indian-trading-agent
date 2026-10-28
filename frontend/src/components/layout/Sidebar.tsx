@@ -26,6 +26,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,7 @@ const navGroups: NavGroup[] = [
   },
   {
     items: [
+      { href: "/brokers", label: "Brokers & Feed", icon: SlidersHorizontal, hint: "Broker accounts & market data" },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },

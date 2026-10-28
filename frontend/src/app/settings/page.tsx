@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { statusColors } from "@/lib/status-colors";
 import { RiskSettings } from "@/components/settings/RiskSettings";
 import { DataProviderSettings } from "@/components/settings/DataProviderSettings";
+import { TelegramSettings } from "@/components/settings/TelegramSettings";
 import { Route, Building2, ExternalLink, ArrowRight, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
@@ -84,6 +85,28 @@ export default function SettingsPage() {
 
       <RiskSettings />
       <DataProviderSettings />
+      <TelegramSettings />
+
+      {/* Broker Accounts & Market Data Link */}
+      <Card className="border-border">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between flex-wrap gap-2">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Broker Accounts &amp; Market Data Configuration
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Manage Zerodha Kite, Upstox, and Kotak Neo API credentials, daily sessions, and quote providers.
+            </CardDescription>
+          </div>
+          <Link href="/brokers">
+            <Button size="sm" variant="outline" className="text-xs flex items-center gap-1.5 font-medium">
+              Configure Brokers
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </CardHeader>
+      </Card>
 
       {/* Multi-Broker Live Execution & Strategy Routing Overview */}
       <Card className="border border-primary/40 bg-card/70 backdrop-blur-md">
